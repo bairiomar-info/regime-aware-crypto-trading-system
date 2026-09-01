@@ -14,30 +14,47 @@ from trading_system.data.models import Instrument, MarketType, Timeframe
 
 
 @pytest.fixture
-def request_model() -> AcquisitionRequest:
+def instrument() -> Instrument:
+    return Instrument(
+        symbol="BTCUSDT",
+        base_asset="BTC",
+        quote_asset="USDT",
+        market_type=MarketType.SPOT,
+        exchange="BINANCE",
+    )
+
+
+@pytest.fixture
+def request_model(instrument: Instrument) -> AcquisitionRequest:
     return AcquisitionRequest(
         provider="binance",
-        instrument=Instrument(base_asset="BTC", quote_asset="USDT", market_type=MarketType.SPOT),
+        instrument=instrument,
         timeframe=Timeframe("1h"),
         start=datetime(2026, 1, 1, tzinfo=UTC),
         end=datetime(2026, 1, 2, tzinfo=UTC),
     )
 
 
-def test_request_rejects_naive_bounds():
+def test_request_rejects_naive_bounds(instrument):
     with pytest.raises(ValueError):
         AcquisitionRequest(
             provider="binance",
-            instrument=Instrument(base_asset="BTC", quote_asset="USDT", market_type=MarketType.SPOT),
+            instrument=instrument,
             timeframe=Timeframe("1h"),
             start=datetime(2026, 1, 1),
             end=datetime(2026, 1, 2, tzinfo=UTC),
         )
 
 
-def test_request_rejects_reversed_bounds(request_model):
+def test_request_rejects_reversed_bounds(instrument):
     with pytest.raises(ValueError):
-        request_model.model_copy(update={"end": request_model.start})
+        AcquisitionRequest(
+            provider="binance",
+            instrument=instrument,
+            timeframe=Timeframe("1h"),
+            start=datetime(2026, 1, 2, tzinfo=UTC),
+            end=datetime(2026, 1, 1, tzinfo=UTC),
+        )
 
 
 def test_checkpoint_accepts_successful_boundary(request_model):
@@ -60,7 +77,11 @@ def test_checkpoint_rejects_boundary_outside_request(request_model):
 
 def test_chunk_requires_positive_interval():
     with pytest.raises(ValueError):
-        AcquisitionChunk(start=datetime(2026, 1, 1, tzinfo=UTC), end=datetime(2026, 1, 1, tzinfo=UTC), sequence=0)
+        AcquisitionChunk(
+            start=datetime(2026, 1, 1, tzinfo=UTC),
+            end=datetime(2026, 1, 1, tzinfo=UTC),
+            sequence=0,
+        )
 
 
 def test_result_tracks_persistence_and_validation(request_model):
