@@ -7,6 +7,10 @@ name = "regime-aware-crypto-trading-system"
 version = "0.1.0"
 description = "Research-driven, regime-aware, long-only spot quantitative crypto trading system."
 requires-python = ">=3.13,<3.14"
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "pyarrow>=20.0,<23.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
