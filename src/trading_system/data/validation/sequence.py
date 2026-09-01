@@ -18,14 +18,14 @@ _TIMEFRAME_DELTAS = {
 
 
 class SequenceValidator:
-    """Validate continuity, ordering, and duplicate identity without repairing data."""
+    """Validate continuity, ordering, and identity without repairing data."""
 
     def __init__(self, record_validator: RecordValidator | None = None) -> None:
         self._record_validator = record_validator or RecordValidator()
 
     def validate(self, candles: list[Candle] | tuple[Candle, ...]) -> ValidationReport:
         anomalies: list[ValidationAnomaly] = []
-        invalid_records = 0
+        invalid_indexes: set[int] = set()
         duplicate_count = 0
         gap_count = 0
         out_of_order_count = 0
@@ -33,12 +33,9 @@ class SequenceValidator:
 
         for index, candle in enumerate(candles):
             record_anomalies = self._record_validator.validate(candle, index=index)
-            errors = tuple(a for a in record_anomalies if a.severity == AnomalySeverity.ERROR)
-            if errors:
-                invalid_records += 1
-                anomalies.extend(record_anomalies)
-            else:
-                anomalies.extend(record_anomalies)
+            anomalies.extend(record_anomalies)
+            if any(a.severity == AnomalySeverity.ERROR for a in record_anomalies):
+                invalid_indexes.add(index)
 
             identity = (
                 candle.instrument.exchange,
@@ -48,6 +45,7 @@ class SequenceValidator:
             )
             if identity in seen:
                 duplicate_count += 1
+                invalid_indexes.add(index)
                 anomalies.append(
                     ValidationAnomaly(
                         code="DUPLICATE_CANDLE",
@@ -56,7 +54,6 @@ class SequenceValidator:
                         index=index,
                     )
                 )
-                invalid_records += 1
             else:
                 seen.add(identity)
 
@@ -64,8 +61,32 @@ class SequenceValidator:
                 continue
 
             previous = candles[index - 1]
+            if candle.instrument != previous.instrument:
+                invalid_indexes.add(index)
+                anomalies.append(
+                    ValidationAnomaly(
+                        code="INSTRUMENT_MISMATCH",
+                        severity=AnomalySeverity.ERROR,
+                        message="Sequence contains candles for different instruments.",
+                        index=index,
+                    )
+                )
+
+            if candle.timeframe != previous.timeframe:
+                invalid_indexes.add(index)
+                anomalies.append(
+                    ValidationAnomaly(
+                        code="TIMEFRAME_MISMATCH",
+                        severity=AnomalySeverity.ERROR,
+                        message="Sequence contains candles with different timeframes.",
+                        index=index,
+                    )
+                )
+                continue
+
             if candle.open_time < previous.open_time:
                 out_of_order_count += 1
+                invalid_indexes.add(index)
                 anomalies.append(
                     ValidationAnomaly(
                         code="OUT_OF_ORDER",
@@ -74,7 +95,6 @@ class SequenceValidator:
                         index=index,
                     )
                 )
-                invalid_records += 1
                 continue
 
             expected = previous.open_time + _TIMEFRAME_DELTAS[previous.timeframe]
@@ -93,9 +113,14 @@ class SequenceValidator:
                     )
                 )
 
-        status = ValidationStatus.FAIL if any(
-            a.severity == AnomalySeverity.ERROR for a in anomalies
-        ) else ValidationStatus.WARNING if anomalies else ValidationStatus.PASS
+        invalid_records = len(invalid_indexes)
+        status = (
+            ValidationStatus.FAIL
+            if any(a.severity == AnomalySeverity.ERROR for a in anomalies)
+            else ValidationStatus.WARNING
+            if anomalies
+            else ValidationStatus.PASS
+        )
 
         return ValidationReport(
             status=status,
