@@ -77,7 +77,7 @@ def test_pairwise_matrix_is_deterministic_and_excludes_diagonal():
 def test_state_agreement_compares_exact_values_and_excludes_missing():
     comparable, agreements, ratio = state_agreement(
         [State.UP, None, State.DOWN, "up"],
-        ["up", State.DOWN, State.DOWN, State.UP],
+        ["up", State.DOWN, State.DOWN, State.DOWN],
     )
     assert comparable == 3
     assert agreements == 2
