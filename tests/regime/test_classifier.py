@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pytest
+
 from trading_system.regime import DimensionConfig, RegimeClassifierConfig, classify_market_state
+from trading_system.regime.classifier import RegimeClassifierState
 from trading_system.regime.models import LevelState, Transition, TrendState
 
 NAMES = ("trend", "volatility", "breadth", "dispersion", "correlation")
@@ -128,6 +131,71 @@ def test_missing_dimension_is_unavailable():
     current["breadth"] = None
     result = classify_market_state(datetime(2026, 1, 1, tzinfo=timezone.utc), current, history, config=config())
     assert result.market_state is None
+
+
+def test_missing_dimension_preserves_other_trackers():
+    current, history = data()
+    cfg = config(confirm=2)
+    first_current = dict(current)
+    first_current["trend"] = "100"
+    first = classify_market_state(datetime(2026, 1, 1, tzinfo=timezone.utc), first_current, history, config=cfg)
+
+    partial = dict(current)
+    partial["trend"] = "10"
+    partial["breadth"] = None
+    second = classify_market_state(
+        datetime(2026, 1, 2, tzinfo=timezone.utc),
+        partial,
+        history,
+        previous=first.classifier_state,
+        config=cfg,
+    )
+    assert second.market_state is None
+    assert second.classifier_state.dimensions["trend"].candidate_state == "NEUTRAL"
+
+    third = classify_market_state(
+        datetime(2026, 1, 3, tzinfo=timezone.utc),
+        partial | {"breadth": "15"},
+        history,
+        previous=second.classifier_state,
+        config=cfg,
+    )
+    assert third.market_state is not None
+    assert third.market_state.trend is TrendState.NEUTRAL
+
+
+def test_decision_time_must_advance():
+    current, history = data()
+    first = classify_market_state(datetime(2026, 1, 2, tzinfo=timezone.utc), current, history, config=config())
+    with pytest.raises(ValueError, match="strictly after"):
+        classify_market_state(
+            datetime(2026, 1, 2, tzinfo=timezone.utc),
+            current,
+            history,
+            previous=first.classifier_state,
+            config=config(),
+        )
+    with pytest.raises(ValueError, match="strictly after"):
+        classify_market_state(
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            current,
+            history,
+            previous=first.classifier_state,
+            config=config(),
+        )
+
+
+def test_classifier_state_mapping_is_immutable():
+    current, history = data()
+    result = classify_market_state(datetime(2026, 1, 1, tzinfo=timezone.utc), current, history, config=config())
+    state = result.classifier_state
+    with pytest.raises(TypeError):
+        state.dimensions["trend"] = state.dimensions["trend"]
+
+
+def test_classifier_state_rejects_naive_last_decision_time():
+    with pytest.raises(ValueError, match="UTC"):
+        RegimeClassifierState(last_decision_time=datetime(2026, 1, 1))
 
 
 def test_order_independent_and_utc_required():
