@@ -11,7 +11,11 @@ from enum import Enum
 from .hysteresis import HysteresisConfig, update_hysteresis
 from .models import LevelState, MarketState, TrendState
 from .state import evidence_confidence, transition_for
-from .thresholds import classify_three_level, classify_trend, empirical_quantile
+from .thresholds import (
+    classify_three_level_hysteresis,
+    classify_trend_hysteresis,
+    empirical_quantile,
+)
 
 
 class Dimension(str, Enum):
@@ -25,13 +29,20 @@ class Dimension(str, Enum):
 @dataclass(frozen=True)
 class DimensionConfig:
     lower_quantile: Decimal = Decimal("0.33")
+    lower_exit_quantile: Decimal = Decimal("0.40")
+    upper_exit_quantile: Decimal = Decimal("0.60")
     upper_quantile: Decimal = Decimal("0.67")
     min_observations: int = 30
     confirmation_bars: int = 2
 
     def __post_init__(self) -> None:
-        if not 0 <= self.lower_quantile < self.upper_quantile <= 1:
-            raise ValueError("quantiles must satisfy 0 <= lower < upper <= 1")
+        if not (
+            Decimal("0") <= self.lower_quantile < self.lower_exit_quantile
+            < self.upper_exit_quantile < self.upper_quantile <= Decimal("1")
+        ):
+            raise ValueError(
+                "quantiles must satisfy 0 <= lower < lower_exit < upper_exit < upper <= 1"
+            )
         if self.min_observations <= 0:
             raise ValueError("min_observations must be positive")
         if self.confirmation_bars <= 0:
@@ -106,20 +117,37 @@ def classify_market_state(
             continue
 
         lower = empirical_quantile(values, dim_cfg.lower_quantile)
+        lower_exit = empirical_quantile(values, dim_cfg.lower_exit_quantile)
+        upper_exit = empirical_quantile(values, dim_cfg.upper_exit_quantile)
         upper = empirical_quantile(values, dim_cfg.upper_quantile)
-        if lower is None or upper is None or lower >= upper:
+        if any(value is None for value in (lower, lower_exit, upper_exit, upper)):
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
+        assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
 
+        prior = old.dimensions.get(dimension.value, DimensionTracker())
         if dimension is Dimension.TREND:
-            candidate = classify_trend(current_value, down_entry=lower, up_entry=upper)
+            candidate = classify_trend_hysteresis(
+                current_value,
+                accepted_state=prior.state,
+                down_entry=lower,
+                down_exit=lower_exit,
+                up_exit=upper_exit,
+                up_entry=upper,
+            )
         else:
-            candidate = classify_three_level(current_value, low_entry=lower, high_entry=upper)
+            candidate = classify_three_level_hysteresis(
+                current_value,
+                accepted_state=prior.state,
+                low_entry=lower,
+                low_exit=lower_exit,
+                high_exit=upper_exit,
+                high_entry=upper,
+            )
         if candidate is None:
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
 
-        prior = old.dimensions.get(dimension.value, DimensionTracker())
         stabilized = update_hysteresis(
             prior.state,
             candidate,
