@@ -6,9 +6,9 @@ from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
 from statistics import median
-from typing import Iterable, Sequence
+from typing import Sequence
 
-from .classifier import DimensionConfig, RegimeClassifierConfig
+from .classifier import DimensionConfig
 from .models import MarketState, TrendState, Transition
 
 
@@ -29,10 +29,10 @@ class SensitivityVariant:
             self.upper_exit_quantile,
             self.upper_quantile,
         )
-        if not 0 <= self.lower_quantile < self.lower_exit_quantile < self.upper_exit_quantile < self.upper_quantile <= 1:
-            raise ValueError("quantiles must satisfy 0 <= lower < lower_exit < upper_exit < upper <= 1")
         if any(not isinstance(value, Decimal) for value in values):
             raise TypeError("quantiles must be Decimal values")
+        if not 0 <= self.lower_quantile < self.lower_exit_quantile < self.upper_exit_quantile < self.upper_quantile <= 1:
+            raise ValueError("quantiles must satisfy 0 <= lower < lower_exit < upper_exit < upper <= 1")
 
 
 def make_sensitivity_variants(
@@ -42,15 +42,15 @@ def make_sensitivity_variants(
 ) -> tuple[SensitivityVariant, ...]:
     """Create a small symmetric neighborhood around the configured thresholds."""
     base = config or DimensionConfig()
-    if delta <= 0:
-        raise ValueError("delta must be positive")
+    if not isinstance(delta, Decimal) or delta <= 0:
+        raise ValueError("delta must be a positive Decimal")
 
     candidates = (
         ("baseline", 0, 0, 0, 0),
-        ("lower_entry_minus", -1, 0, 0, 1),
+        ("lower_entry_minus", -1, 0, 0, 0),
         ("lower_exit_minus", 0, -1, 0, 0),
         ("upper_exit_plus", 0, 0, 1, 0),
-        ("upper_entry_plus", -1, 0, 0, 1),
+        ("upper_entry_plus", 0, 0, 0, 1),
         ("wider_band", -1, -1, 1, 1),
         ("narrower_band", 1, 1, -1, -1),
     )
@@ -62,9 +62,8 @@ def make_sensitivity_variants(
             base.upper_exit_quantile + delta * upper_exit,
             base.upper_quantile + delta * upper,
         )
-        if not 0 <= values[0] < values[1] < values[2] < values[3] <= 1:
-            continue
-        variants.append(SensitivityVariant(name, *values))
+        if 0 <= values[0] < values[1] < values[2] < values[3] <= 1:
+            variants.append(SensitivityVariant(name, *values))
     return tuple(variants)
 
 
