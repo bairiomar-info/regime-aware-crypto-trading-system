@@ -3,6 +3,8 @@
 from .models import (
     AcquisitionRun,
     ArtifactAcquisition,
+    CanonicalDatasetManifest,
+    CanonicalDatasetResource,
     ChecksumStatus,
     DatasetIdentity,
     Provenance,
@@ -13,6 +15,8 @@ from .models import (
 __all__ = [
     "AcquisitionRun",
     "ArtifactAcquisition",
+    "CanonicalDatasetManifest",
+    "CanonicalDatasetResource",
     "ChecksumStatus",
     "DatasetIdentity",
     "Provenance",
