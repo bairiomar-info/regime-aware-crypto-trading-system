@@ -123,10 +123,19 @@ def test_non_trend_dimension_changes_do_not_change_trend_by_themselves():
 
     assert first.market_state.trend is TrendState.NEUTRAL
     assert second.market_state.trend is TrendState.NEUTRAL
-    assert second.market_state.volatility is LevelState.HIGH
-    assert second.market_state.breadth is LevelState.LOW
-    assert second.market_state.dispersion is LevelState.HIGH
-    assert second.market_state.correlation is LevelState.HIGH
+    # Non-trend dimensions also use temporal confirmation. One changed
+    # observation therefore remains in the prior accepted state.
+    assert second.market_state.volatility is LevelState.NORMAL
+    assert second.market_state.breadth is LevelState.NORMAL
+    assert second.market_state.dispersion is LevelState.NORMAL
+    assert second.market_state.correlation is LevelState.NORMAL
+
+    third = _run(changed, history, second.classifier_state, offset=2)
+    assert third.market_state.trend is TrendState.NEUTRAL
+    assert third.market_state.volatility is LevelState.HIGH
+    assert third.market_state.breadth is LevelState.LOW
+    assert third.market_state.dispersion is LevelState.HIGH
+    assert third.market_state.correlation is LevelState.HIGH
 
 
 def test_missing_dimension_blocks_market_state_but_preserves_other_states():
@@ -175,6 +184,15 @@ def test_configuration_changes_are_explicit_and_deterministic():
     loose = _run(_current("100"), history, confirm=1)
     strict = _run(_current("100"), history, confirm=3)
 
+    # The first observation establishes the initial accepted state regardless
+    # of confirmation length. Confirmation applies to subsequent transitions.
     assert loose.market_state.trend is TrendState.UP
-    assert strict.market_state.trend is TrendState.NEUTRAL
-    assert strict.classifier_state.dimensions["trend"].candidate_state == "UP"
+    assert strict.market_state.trend is TrendState.UP
+    assert loose.classifier_state == strict.classifier_state
+
+    loose_down = _run(_current("-100"), history, loose.classifier_state, offset=1, confirm=1)
+    strict_down = _run(_current("-100"), history, strict.classifier_state, offset=1, confirm=3)
+
+    assert loose_down.market_state.trend is TrendState.DOWN
+    assert strict_down.market_state.trend is TrendState.UP
+    assert strict_down.classifier_state.dimensions["trend"].candidate_state == "DOWN"
