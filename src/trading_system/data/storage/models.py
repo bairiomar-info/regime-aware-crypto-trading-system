@@ -149,3 +149,92 @@ class DatasetIdentity(BaseModel):
     def model_post_init(self, __context: object) -> None:
         if self.end <= self.start:
             raise ValueError("dataset end must be after start")
+
+
+class CanonicalDatasetResource(BaseModel):
+    """Immutable manifest entry for one canonical Parquet resource."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    path: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    byte_size: int = Field(ge=0)
+    row_count: int = Field(ge=0)
+    min_timestamp: datetime | None = None
+    max_timestamp: datetime | None = None
+
+    @field_validator("min_timestamp", "max_timestamp")
+    @classmethod
+    def require_utc(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value):
+            raise ValueError("resource timestamps must be UTC-aware")
+        return value
+
+    @model_validator(mode="after")
+    def validate_timestamp_bounds(self) -> "CanonicalDatasetResource":
+        if (
+            self.min_timestamp is not None
+            and self.max_timestamp is not None
+            and self.max_timestamp < self.min_timestamp
+        ):
+            raise ValueError("max_timestamp must not precede min_timestamp")
+        if self.row_count == 0 and (
+            self.min_timestamp is not None or self.max_timestamp is not None
+        ):
+            raise ValueError("empty resources must not have timestamp bounds")
+        return self
+
+
+class CanonicalDatasetManifest(BaseModel):
+    """Immutable manifest describing one canonical dataset release."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    dataset_id: str = Field(min_length=1)
+    dataset_version: str = Field(
+        pattern=r"^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$"
+    )
+    schema_version: str = Field(min_length=1)
+    normalization_version: str = Field(min_length=1)
+    validation_version: str = Field(min_length=1)
+    input_artifact_ids: tuple[str, ...] = ()
+    code_commit: str | None = None
+    configuration_hash: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
+    resources: tuple[CanonicalDatasetResource, ...] = Field(min_length=1)
+    total_row_count: int = Field(ge=0)
+    min_timestamp: datetime | None = None
+    max_timestamp: datetime | None = None
+
+    @field_validator("min_timestamp", "max_timestamp")
+    @classmethod
+    def require_utc(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value):
+            raise ValueError("dataset timestamps must be UTC-aware")
+        return value
+
+    @model_validator(mode="after")
+    def validate_manifest(self) -> "CanonicalDatasetManifest":
+        calculated_rows = sum(resource.row_count for resource in self.resources)
+        if calculated_rows != self.total_row_count:
+            raise ValueError("total_row_count must equal the sum of resource row counts")
+
+        resource_min = min(
+            (resource.min_timestamp for resource in self.resources if resource.min_timestamp is not None),
+            default=None,
+        )
+        resource_max = max(
+            (resource.max_timestamp for resource in self.resources if resource.max_timestamp is not None),
+            default=None,
+        )
+        if self.min_timestamp != resource_min:
+            raise ValueError("min_timestamp must equal the earliest resource timestamp")
+        if self.max_timestamp != resource_max:
+            raise ValueError("max_timestamp must equal the latest resource timestamp")
+        if self.min_timestamp is not None and self.max_timestamp is not None:
+            if self.max_timestamp < self.min_timestamp:
+                raise ValueError("max_timestamp must not precede min_timestamp")
+        return self
