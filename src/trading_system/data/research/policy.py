@@ -30,7 +30,7 @@ class UniversePolicy(BaseModel):
 
     @field_validator("allowed_quote_assets", "excluded_classifications")
     @classmethod
-    def normalize_uppercase_values(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+    def normalize_upper_values(cls, values: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(value.upper() for value in values)
 
     @field_validator("minimum_quote_volume")
