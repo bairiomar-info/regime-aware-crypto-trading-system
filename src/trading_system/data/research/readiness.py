@@ -1,8 +1,9 @@
 """Point-in-time feature and strategy readiness contracts."""
 
+from datetime import UTC, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ReadinessState(StrEnum):
@@ -20,11 +21,18 @@ class ReadinessDecision(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
 
     instrument_id: str = Field(min_length=1)
-    decision_time: object
+    decision_time: datetime
     state: ReadinessState
     available_bars: int = Field(ge=0)
     required_bars: int = Field(ge=0)
     reason: str = Field(min_length=1)
+
+    @field_validator("decision_time")
+    @classmethod
+    def require_utc(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value):
+            raise ValueError("decision_time must be UTC-aware")
+        return value
 
     def model_post_init(self, __context: object) -> None:
         if self.state == ReadinessState.INSUFFICIENT_HISTORY and self.available_bars >= self.required_bars:
@@ -36,7 +44,7 @@ class ReadinessDecision(BaseModel):
 def assess_readiness(
     *,
     instrument_id: str,
-    decision_time,
+    decision_time: datetime,
     available_bars: int,
     required_bars: int,
     strategy_ready: bool = False,
