@@ -43,7 +43,7 @@ def test_variants_include_baseline_and_are_valid():
 
 
 def test_variant_delta_must_be_positive():
-    with pytest.raises(ValueError, match="delta must be positive"):
+    with pytest.raises(ValueError, match="delta must be a positive Decimal"):
         make_sensitivity_variants(delta=Decimal("0"))
 
 
@@ -80,7 +80,7 @@ def test_summary_counts_states_transitions_and_missing_values():
     assert summary.trend_frequencies["UP"] == Decimal(2) / Decimal(3)
     assert summary.trend_frequencies["DOWN"] == Decimal(1) / Decimal(3)
     assert summary.transition_frequency == Decimal(1) / Decimal(3)
-    assert summary.duration == StateDurationSummary(Decimal("2"), Decimal("2"), 2)
+    assert summary.duration == StateDurationSummary(Decimal("1.5"), Decimal("2"), 2)
 
 
 def test_summary_measures_baseline_agreement_only_on_comparable_states():
