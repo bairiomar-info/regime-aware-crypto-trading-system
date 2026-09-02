@@ -23,13 +23,14 @@ class UniversePolicy(BaseModel):
     minimum_history_bars: int = Field(default=0, ge=0)
     minimum_quote_volume: str | None = None
 
-    @field_validator(
-        "allowed_market_types",
-        "allowed_quote_assets",
-        "excluded_classifications",
-    )
+    @field_validator("allowed_market_types")
     @classmethod
-    def normalize_values(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+    def normalize_market_types(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(value.lower() for value in values)
+
+    @field_validator("allowed_quote_assets", "excluded_classifications")
+    @classmethod
+    def normalize_uppercase_values(cls, values: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(value.upper() for value in values)
 
     @field_validator("minimum_quote_volume")
