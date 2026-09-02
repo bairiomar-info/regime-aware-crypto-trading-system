@@ -20,13 +20,7 @@ def evaluate_eligibility(
     classification: str | None = None,
     evidence_available_at: datetime | None = None,
 ) -> EligibilityDecision:
-    """Evaluate one instrument using only as-of information.
-
-    Callers are responsible for supplying observations whose own availability
-    timestamp is no later than ``decision_time``. The explicit availability
-    check prevents an accidentally future-dated evidence bundle from being
-    accepted by the research layer.
-    """
+    """Evaluate one instrument using only as-of information."""
     if evidence_available_at is not None and evidence_available_at > decision_time:
         return EligibilityDecision(
             instrument_id=instrument_id,
