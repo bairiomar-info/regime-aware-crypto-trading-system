@@ -9,6 +9,7 @@ from trading_system.data.storage import (
     CANONICAL_SCHEMA,
     CanonicalDatasetManifest,
     CanonicalDatasetResource,
+    DatasetPublicationError,
     ParquetWriteError,
     Provenance,
     candles_to_arrow,
@@ -41,6 +42,23 @@ def make_candle(minute: int, *, close: str = "101") -> Candle:
         taker_buy_quote_volume=Decimal("500.123456789012345678"),
         source="binance",
         is_closed=True,
+    )
+
+
+def make_manifest(resource: CanonicalDatasetResource) -> CanonicalDatasetManifest:
+    return CanonicalDatasetManifest(
+        dataset_id="spot_ohlcv",
+        dataset_version="v1.0.0",
+        schema_version="1.0.0",
+        normalization_version="1.0.0",
+        validation_version="1.0.0",
+        input_artifact_ids=("sha256:" + "a" * 64,),
+        code_commit="abc123",
+        configuration_hash="b" * 64,
+        resources=(resource,),
+        total_row_count=resource.row_count,
+        min_timestamp=resource.min_timestamp,
+        max_timestamp=resource.max_timestamp,
     )
 
 
@@ -96,23 +114,10 @@ def test_same_canonical_input_has_stable_file_hash(tmp_path) -> None:
     assert first_result.resource.sha256 == second_result.resource.sha256
 
 
-def test_manifest_publication_is_atomic(tmp_path) -> None:
+def test_manifest_publication_is_atomic_and_verifies_resource(tmp_path) -> None:
     parquet = tmp_path / "btc.parquet"
     resource = write_canonical_parquet([make_candle(0)], parquet).resource
-    manifest = CanonicalDatasetManifest(
-        dataset_id="spot_ohlcv",
-        dataset_version="v1.0.0",
-        schema_version="1.0.0",
-        normalization_version="1.0.0",
-        validation_version="1.0.0",
-        input_artifact_ids=("sha256:" + "a" * 64,),
-        code_commit="abc123",
-        configuration_hash="b" * 64,
-        resources=(resource,),
-        total_row_count=1,
-        min_timestamp=resource.min_timestamp,
-        max_timestamp=resource.max_timestamp,
-    )
+    manifest = make_manifest(resource)
 
     manifest_path = tmp_path / "manifest.json"
     published = publish_canonical_dataset(manifest, manifest_path)
@@ -121,6 +126,42 @@ def test_manifest_publication_is_atomic(tmp_path) -> None:
     assert manifest_path.exists()
     assert manifest_path.read_text(encoding="utf-8").endswith("\n")
     assert '"dataset_id": "spot_ohlcv"' in manifest_path.read_text(encoding="utf-8")
+
+
+def test_publication_rejects_modified_resource(tmp_path) -> None:
+    parquet = tmp_path / "btc.parquet"
+    resource = write_canonical_parquet([make_candle(0)], parquet).resource
+    manifest = make_manifest(resource)
+    parquet.write_bytes(parquet.read_bytes() + b"tampered")
+
+    with pytest.raises(DatasetPublicationError, match="byte size mismatch|SHA-256 mismatch"):
+        publish_canonical_dataset(manifest, tmp_path / "manifest.json")
+
+
+def test_publication_rejects_existing_manifest(tmp_path) -> None:
+    parquet = tmp_path / "btc.parquet"
+    resource = write_canonical_parquet([make_candle(0)], parquet).resource
+    manifest = make_manifest(resource)
+    manifest_path = tmp_path / "manifest.json"
+    publish_canonical_dataset(manifest, manifest_path)
+
+    with pytest.raises(DatasetPublicationError, match="already exists"):
+        publish_canonical_dataset(manifest, manifest_path)
+
+
+def test_publication_rejects_missing_resource(tmp_path) -> None:
+    resource = CanonicalDatasetResource(
+        path=str(tmp_path / "missing.parquet"),
+        sha256="a" * 64,
+        byte_size=1,
+        row_count=1,
+        min_timestamp=datetime(2026, 1, 1, 0, 0, tzinfo=UTC),
+        max_timestamp=datetime(2026, 1, 1, 0, 0, tzinfo=UTC),
+    )
+    manifest = make_manifest(resource)
+
+    with pytest.raises(DatasetPublicationError, match="does not exist"):
+        publish_canonical_dataset(manifest, tmp_path / "manifest.json")
 
 
 def test_empty_resource_has_no_timestamp_bounds(tmp_path) -> None:
