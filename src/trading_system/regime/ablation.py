@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
 from typing import Mapping, Sequence
 
@@ -48,7 +49,16 @@ def state_signature(
 ) -> tuple[tuple[str, str | None], ...]:
     """Return a deterministic signature containing only enabled dimensions."""
     return tuple(
-        (dimension, None if states.get(dimension) is None else str(states[dimension].value if isinstance(states[dimension], Enum) else states[dimension]))
+        (
+            dimension,
+            None
+            if states.get(dimension) is None
+            else str(
+                states[dimension].value
+                if isinstance(states[dimension], Enum)
+                else states[dimension]
+            ),
+        )
         for dimension in spec.dimensions
     )
 
@@ -58,7 +68,7 @@ class AblationComparison:
     observations: int
     comparable: int
     agreements: int
-    agreement_ratio: float | None
+    agreement_ratio: Decimal | None
 
 
 def compare_shared_dimensions(
@@ -80,5 +90,5 @@ def compare_shared_dimensions(
         comparable += 1
         if left_sig == right_sig:
             agreements += 1
-    ratio = agreements / comparable if comparable else None
+    ratio = Decimal(agreements) / Decimal(comparable) if comparable else None
     return AblationComparison(observations, comparable, agreements, ratio)
