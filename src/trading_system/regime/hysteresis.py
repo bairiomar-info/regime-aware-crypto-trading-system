@@ -1,4 +1,8 @@
-"""Stateful hysteresis primitives for regime stabilization."""
+"""Stateful confirmation primitives for regime stabilization.
+
+Threshold entry/exit hysteresis is handled by the regime threshold classifiers.
+This module handles the separate temporal confirmation requirement.
+"""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -35,9 +39,9 @@ def update_hysteresis(
     state_age: int = 0,
     config: HysteresisConfig | None = None,
 ) -> HysteresisResult:
-    """Advance one observation without looking ahead.
+    """Advance one observation using temporal confirmation only.
 
-    A new state is accepted after the configured number of consecutive
+    A new candidate is accepted after the configured number of consecutive
     observations. Repeated observations of the accepted state reset any
     candidate and increment state age.
     """
