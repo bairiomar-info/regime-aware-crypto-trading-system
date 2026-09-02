@@ -1,6 +1,6 @@
 # Regime Classifier Design V1
 
-**Status:** Implementation contract / research gate
+**Status:** Implementation contract / research gate  
 **Date:** 2026-09-02
 
 ## Purpose
@@ -89,6 +89,16 @@ The accepted state and candidate state are retained separately. A reversal to th
 
 The first valid observation initializes the accepted state and has `state_age = 1`.
 
+## Sequential state safety
+
+The classifier state records the latest `decision_time` used to produce it.
+
+When a previous classifier state is supplied, the next `decision_time` must be strictly later. Equal or earlier timestamps are rejected rather than silently reprocessing or rolling the state backward.
+
+The classifier state also preserves dimension trackers when another dimension is temporarily unavailable. A partial result does not fabricate a complete `MarketState`, but it must not discard valid pending candidates or accepted-state history from other dimensions.
+
+The classifier state mapping is immutable to callers. This prevents external mutation from changing subsequent regime decisions without producing a new classifier state.
+
 ## State history
 
 The classifier processes observations sequentially. It never examines future states to determine the current state.
@@ -100,6 +110,7 @@ For each decision time it records:
 - transition of the directional trend state
 - state age
 - confidence metadata
+- latest processed decision time in classifier state
 
 ## Transition semantics
 
@@ -133,7 +144,7 @@ A dimension without sufficient current/reference data is unavailable. The classi
 
 The V1 `MarketState` contract currently requires all five dimensions, so a complete market state can only be emitted when all five dimension classifications are available.
 
-Partial dimension results may be represented by lower-level classifier results but must not be silently promoted to a complete `MarketState`.
+Partial dimension results may be represented by lower-level classifier results but must not be silently promoted to a complete `MarketState`. Existing dimension trackers must remain preserved across such partial calls.
 
 ## Confidence
 
@@ -189,10 +200,13 @@ Tests must cover:
 8. accepted-state age
 9. every transition direction
 10. missing dimensions
-11. deterministic repeated execution
-12. mapping-order independence
-13. immutable `MarketState`
-14. no future observation access
+11. temporary missing-dimension tracker preservation
+12. monotonic decision-time enforcement
+13. deterministic repeated execution
+14. mapping-order independence
+15. immutable `MarketState`
+16. immutable classifier-state mapping
+17. no future observation access
 
 ## Research rationale
 
