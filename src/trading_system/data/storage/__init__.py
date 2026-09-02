@@ -1,5 +1,21 @@
 """Immutable market-data storage and provenance primitives."""
 
-from .models import DatasetIdentity, Provenance, StorageRecord
+from .models import (
+    AcquisitionRun,
+    ArtifactAcquisition,
+    ChecksumStatus,
+    DatasetIdentity,
+    Provenance,
+    RawArtifact,
+    StorageRecord,
+)
 
-__all__ = ["DatasetIdentity", "Provenance", "StorageRecord"]
+__all__ = [
+    "AcquisitionRun",
+    "ArtifactAcquisition",
+    "ChecksumStatus",
+    "DatasetIdentity",
+    "Provenance",
+    "RawArtifact",
+    "StorageRecord",
+]
