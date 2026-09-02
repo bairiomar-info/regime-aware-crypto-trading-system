@@ -43,15 +43,16 @@ def evaluate_eligibility(
     elif membership_status != MembershipStatus.TRADABLE:
         reasons.append(EligibilityReason.NOT_TRADABLE)
 
-    if market_type.upper() not in policy.allowed_market_types:
+    # UniversePolicy stores market types in canonical lowercase form.
+    if market_type.strip().lower() not in policy.allowed_market_types:
         reasons.append(EligibilityReason.WRONG_MARKET_TYPE)
 
-    if quote_asset.upper() not in policy.allowed_quote_assets:
+    if quote_asset.strip().upper() not in policy.allowed_quote_assets:
         reasons.append(EligibilityReason.DISALLOWED_QUOTE_ASSET)
 
     if (
         classification is not None
-        and classification.upper() in policy.excluded_classifications
+        and classification.strip().upper() in policy.excluded_classifications
     ):
         reasons.append(EligibilityReason.EXCLUDED_CLASSIFICATION)
 
