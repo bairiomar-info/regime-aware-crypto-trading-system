@@ -13,6 +13,7 @@ from .models import (
 )
 from .policy import UniversePolicy
 from .readiness import ReadinessDecision, ReadinessState, assess_readiness
+from .redundancy import pairwise_spearman_matrix, spearman_rank_correlation, state_agreement
 from .universe import evaluate_eligibility
 
 __all__ = [
@@ -34,5 +35,8 @@ __all__ = [
     "evaluate_eligibility",
     "membership_at",
     "pairwise_correlation",
+    "pairwise_spearman_matrix",
+    "spearman_rank_correlation",
     "rolling_quote_volume",
+    "state_agreement",
 ]
