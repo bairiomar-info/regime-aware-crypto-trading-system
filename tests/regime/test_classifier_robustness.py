@@ -96,7 +96,7 @@ def test_temporary_missing_dimension_preserves_prior_trackers():
 
     assert second.market_state is None
     assert second.classifier_state.dimensions["trend"].state == "NEUTRAL"
-    assert second.classifier_state.dimensions["breadth"].state == "NEUTRAL"
+    assert second.classifier_state.dimensions["breadth"].state == "NORMAL"
 
     third = _run(_current(), history, second.classifier_state, offset=2, confirm=2)
     assert third.market_state is not None
