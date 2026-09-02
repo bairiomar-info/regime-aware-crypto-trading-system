@@ -12,6 +12,14 @@ from .classifier import (
 )
 from .hysteresis import HysteresisConfig, HysteresisResult, HysteresisState, update_hysteresis
 from .models import LevelState, MarketState, Transition, TrendState
+from .sensitivity import (
+    SensitivitySummary,
+    SensitivityVariant,
+    StateDurationSummary,
+    apply_variant,
+    make_sensitivity_variants,
+    summarize_states,
+)
 from .state import evidence_confidence, transition_for
 from .thresholds import (
     classify_three_level,
@@ -37,6 +45,12 @@ __all__ = [
     "MarketState",
     "Transition",
     "TrendState",
+    "SensitivitySummary",
+    "SensitivityVariant",
+    "StateDurationSummary",
+    "apply_variant",
+    "make_sensitivity_variants",
+    "summarize_states",
     "classify_three_level",
     "classify_three_level_hysteresis",
     "classify_trend",
