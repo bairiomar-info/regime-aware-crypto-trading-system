@@ -1,5 +1,6 @@
 """Immutable market-data storage and provenance primitives."""
 
+from .canonical import CanonicalizationContract, QualityClassification, QualityDiagnostic
 from .models import (
     AcquisitionRun,
     ArtifactAcquisition,
@@ -17,9 +18,12 @@ __all__ = [
     "ArtifactAcquisition",
     "CanonicalDatasetManifest",
     "CanonicalDatasetResource",
+    "CanonicalizationContract",
     "ChecksumStatus",
     "DatasetIdentity",
     "Provenance",
+    "QualityClassification",
+    "QualityDiagnostic",
     "RawArtifact",
     "StorageRecord",
 ]
