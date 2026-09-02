@@ -15,26 +15,24 @@ def transition_for(current: TrendState, previous: TrendState | None) -> Transiti
             TrendState.DOWN: Transition.PERSISTING_DOWN,
         }[current]
     pairs = {
-        (TrendState.UP, TrendState.NEUTRAL): Transition.NEUTRAL_TO_UP,
+        (TrendState.UP, TrendState.NEUTRAL): Transition.UP_TO_NEUTRAL,
         (TrendState.UP, TrendState.DOWN): Transition.DOWN_TO_UP,
-        (TrendState.NEUTRAL, TrendState.UP): Transition.UP_TO_NEUTRAL,
-        (TrendState.NEUTRAL, TrendState.DOWN): Transition.DOWN_TO_NEUTRAL,
+        (TrendState.NEUTRAL, TrendState.UP): Transition.NEUTRAL_TO_UP,
+        (TrendState.NEUTRAL, TrendState.DOWN): Transition.NEUTRAL_TO_DOWN,
         (TrendState.DOWN, TrendState.UP): Transition.UP_TO_DOWN,
-        (TrendState.DOWN, TrendState.NEUTRAL): Transition.NEUTRAL_TO_DOWN,
+        (TrendState.DOWN, TrendState.NEUTRAL): Transition.DOWN_TO_NEUTRAL,
     }
     return pairs[(previous, current)]
 
 
-def evidence_confidence(states: Iterable[object | None]) -> Decimal:
-    """Return the fraction of present dimensions agreeing with the majority.
+def evidence_confidence(evidence: Iterable[bool | None]) -> Decimal:
+    """Return the fraction of present evidence items that agree.
 
-    This is evidence coherence, not a predictive probability. Missing
-    dimensions are excluded from both numerator and denominator.
+    This intentionally accepts explicit agreement flags rather than mixing
+    incomparable categorical dimensions such as volatility and trend. It is
+    evidence coherence, not a predictive probability.
     """
-    present = [state for state in states if state is not None]
+    present = [item for item in evidence if item is not None]
     if not present:
         return Decimal("0")
-    counts: dict[object, int] = {}
-    for state in present:
-        counts[state] = counts.get(state, 0) + 1
-    return Decimal(max(counts.values())) / Decimal(len(present))
+    return Decimal(sum(present)) / Decimal(len(present))
