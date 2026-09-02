@@ -127,5 +127,5 @@ def test_membership_lookup_rejects_overlapping_intervals():
                 build_membership_intervals([first, second])[0],
             ],
             instrument_id="BINANCE:BTCUSDT",
-            decision_time=T1,
+            decision_time=T0,
         )
