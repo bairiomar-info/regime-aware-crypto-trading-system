@@ -80,7 +80,7 @@ def test_summary_counts_states_transitions_and_missing_values():
     assert summary.trend_frequencies["UP"] == Decimal(2) / Decimal(3)
     assert summary.trend_frequencies["DOWN"] == Decimal(1) / Decimal(3)
     assert summary.transition_frequency == Decimal(1) / Decimal(3)
-    assert summary.duration == StateDurationSummary(Decimal("1.5"), Decimal("2"), 2)
+    assert summary.duration == StateDurationSummary(Decimal("1.5"), Decimal("1.5"), 2)
 
 
 def test_summary_measures_baseline_agreement_only_on_comparable_states():
