@@ -1,6 +1,7 @@
 """Deterministic construction of point-in-time membership intervals."""
 
 from collections.abc import Iterable
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -13,26 +14,22 @@ class MembershipEvent(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
 
     instrument_id: str = Field(min_length=1)
-    effective_at: object
+    effective_at: datetime
     status: MembershipStatus
     source: str = Field(min_length=1)
-    source_available_at: object | None = None
+    source_available_at: datetime | None = None
 
     @field_validator("effective_at", "source_available_at")
     @classmethod
-    def require_datetime(cls, value):
-        from datetime import UTC, datetime
-
+    def require_utc(cls, value: datetime | None) -> datetime | None:
         if value is None:
             return None
-        if not isinstance(value, datetime):
-            raise TypeError("membership event timestamps must be datetimes")
         if value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value):
             raise ValueError("membership event timestamps must be UTC-aware")
         return value
 
     @model_validator(mode="after")
-    def validate_availability(self):
+    def validate_availability(self) -> "MembershipEvent":
         if (
             self.source_available_at is not None
             and self.source_available_at > self.effective_at
@@ -46,10 +43,9 @@ def build_membership_intervals(
 ) -> tuple[PointInTimeMembership, ...]:
     """Build deterministic half-open membership intervals from state events.
 
-    Events are ordered by instrument, effective time, and stable event content.
-    Two different states at the same effective time are rejected because there
-    is no defensible deterministic choice between conflicting evidence.
-    Repeated identical states are collapsed as redundant observations.
+    Events are ordered by instrument, effective time, status, and source.
+    Conflicting states at the same effective time are rejected. Repeated
+    identical states at the same time are collapsed as redundant observations.
     """
     ordered = sorted(
         events,
@@ -76,8 +72,6 @@ def build_membership_intervals(
                         f"conflicting membership states at {instrument_id} "
                         f"and {event.effective_at.isoformat()}"
                     )
-                # Same state at the same time is redundant. Keep the
-                # lexicographically first source for deterministic provenance.
                 continue
             compacted.append(event)
 
@@ -105,7 +99,7 @@ def membership_at(
     intervals: Iterable[PointInTimeMembership],
     *,
     instrument_id: str,
-    decision_time,
+    decision_time: datetime,
 ) -> PointInTimeMembership | None:
     """Return the interval containing ``decision_time`` for an instrument."""
     matches = [
