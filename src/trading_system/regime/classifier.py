@@ -133,10 +133,14 @@ def classify_market_state(
         lower_exit = empirical_quantile(values, dim_cfg.lower_exit_quantile)
         upper_exit = empirical_quantile(values, dim_cfg.upper_exit_quantile)
         upper = empirical_quantile(values, dim_cfg.upper_quantile)
-        if any(value is None for value in (lower, lower_exit, upper_exit, upper)):
+        boundaries = (lower, lower_exit, upper_exit, upper)
+        if any(value is None for value in boundaries):
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
         assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
+        if not lower < lower_exit < upper_exit < upper:
+            results.append(DimensionClassification(dimension, None, False, reference_count))
+            continue
 
         if dimension is Dimension.TREND:
             candidate = classify_trend_hysteresis(
