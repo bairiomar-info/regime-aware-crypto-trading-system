@@ -63,6 +63,10 @@ class ParquetWriteError(ValueError):
     """Raised when canonical data cannot be represented by the V1 Parquet schema."""
 
 
+class DatasetPublicationError(ValueError):
+    """Raised when an immutable canonical dataset cannot be published safely."""
+
+
 def candles_to_arrow(candles: Iterable[Candle]) -> pa.Table:
     """Convert validated canonical candles into the exact V1 Arrow schema."""
     rows = list(candles)
@@ -137,11 +141,7 @@ def write_canonical_parquet(
 
 
 def write_candles(path: str | Path, candles: Iterable[Candle]) -> None:
-    """Backward-compatible acquisition/storage entry point.
-
-    The canonical V1 writer is now authoritative; this wrapper preserves the
-    existing acquisition API while intentionally discarding the write result.
-    """
+    """Backward-compatible acquisition/storage entry point."""
     write_canonical_parquet(candles, path)
 
 
@@ -149,8 +149,17 @@ def publish_canonical_dataset(
     manifest: CanonicalDatasetManifest,
     manifest_path: str | Path,
 ) -> Path:
-    """Atomically publish an already-validated immutable dataset manifest."""
+    """Validate resources and atomically publish an immutable dataset manifest.
+
+    Publication is rejected when a referenced resource is missing, changed,
+    unreadable, schema-incompatible, or inconsistent with its manifest metadata.
+    An existing manifest is never overwritten.
+    """
     target = Path(manifest_path)
+    if target.exists():
+        raise DatasetPublicationError(f"dataset manifest already exists: {target}")
+
+    _verify_manifest_resources(manifest)
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump_json(indent=2) + "\n"
 
@@ -173,6 +182,53 @@ def publish_canonical_dataset(
 def read_candles(path: str | Path) -> list[dict]:
     """Read canonical records while preserving Arrow decimal values."""
     return pq.read_table(path, columns=_COLUMNS).to_pylist()
+
+
+def _verify_manifest_resources(manifest: CanonicalDatasetManifest) -> None:
+    """Verify every physical resource against the immutable manifest contract."""
+    for resource in manifest.resources:
+        path = Path(resource.path)
+        if not path.is_file():
+            raise DatasetPublicationError(f"manifest resource does not exist: {path}")
+
+        actual_size = path.stat().st_size
+        if actual_size != resource.byte_size:
+            raise DatasetPublicationError(
+                f"resource byte size mismatch for {path}: "
+                f"expected {resource.byte_size}, got {actual_size}"
+            )
+
+        actual_hash = _sha256_file(path)
+        if actual_hash.lower() != resource.sha256.lower():
+            raise DatasetPublicationError(f"resource SHA-256 mismatch for {path}")
+
+        try:
+            parquet_schema = pq.read_schema(path)
+            if parquet_schema != CANONICAL_SCHEMA:
+                raise DatasetPublicationError(
+                    f"resource schema mismatch for {path}"
+                )
+            metadata = pq.read_metadata(path)
+            if metadata.num_rows != resource.row_count:
+                raise DatasetPublicationError(
+                    f"resource row count mismatch for {path}: "
+                    f"expected {resource.row_count}, got {metadata.num_rows}"
+                )
+            table = pq.read_table(path, columns=["open_time"])
+        except DatasetPublicationError:
+            raise
+        except Exception as exc:
+            raise DatasetPublicationError(
+                f"unable to validate Parquet resource {path}"
+            ) from exc
+
+        timestamps = table.column("open_time").to_pylist()
+        actual_min = _require_utc(timestamps[0]) if timestamps else None
+        actual_max = _require_utc(timestamps[-1]) if timestamps else None
+        if actual_min != resource.min_timestamp or actual_max != resource.max_timestamp:
+            raise DatasetPublicationError(
+                f"resource timestamp bounds mismatch for {path}"
+            )
 
 
 def _validate_decimal128(value: Decimal, field_name: str) -> None:
