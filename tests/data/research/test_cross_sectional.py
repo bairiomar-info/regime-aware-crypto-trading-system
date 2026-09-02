@@ -42,7 +42,7 @@ def test_cross_sectional_rank_empty_input_is_empty():
 
 def test_breadth_uses_valid_cross_section_as_denominator():
     result = breadth({"A": "0.10", "B": "-0.02", "C": None, "D": "0"})
-    assert result == (Decimal("0.5"), 1, 3, True)
+    assert result == (Decimal(1) / Decimal(3), 1, 3, True)
 
 
 def test_breadth_supports_explicit_threshold():
