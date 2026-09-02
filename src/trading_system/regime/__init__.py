@@ -1,5 +1,13 @@
 """V1 multidimensional market-regime primitives."""
 
+from .ablation import (
+    AblationComparison,
+    AblationSpec,
+    AblationVariant,
+    compare_shared_dimensions,
+    pre_registered_ablation_specs,
+    state_signature,
+)
 from .classifier import (
     Dimension,
     DimensionClassification,
@@ -30,6 +38,9 @@ from .thresholds import (
 )
 
 __all__ = [
+    "AblationComparison",
+    "AblationSpec",
+    "AblationVariant",
     "Dimension",
     "DimensionClassification",
     "DimensionConfig",
@@ -59,4 +70,7 @@ __all__ = [
     "evidence_confidence",
     "transition_for",
     "update_hysteresis",
+    "compare_shared_dimensions",
+    "pre_registered_ablation_specs",
+    "state_signature",
 ]
