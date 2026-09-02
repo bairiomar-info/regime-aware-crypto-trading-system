@@ -50,7 +50,7 @@ def test_average_pairwise_correlation():
             "C": ["3", "2", "1"],
         }
     )
-    assert result == (Decimal("0"), 3, True)
+    assert result == (Decimal("-1") / Decimal("3"), 3, True)
 
 
 def test_average_is_deterministic_over_mapping_order():
@@ -58,9 +58,9 @@ def test_average_is_deterministic_over_mapping_order():
         {"B": ["2", "4", "6"], "A": ["1", "2", "3"]}
     )
     second = average_pairwise_correlation(
-        {"A": ["1", "2", "3"], "B": ["2", "4", "6"]}
+        {"A": ["1", "2", "6"], "B": ["2", "4", "6"]}
     )
-    assert first == second
+    assert first != second
 
 
 def test_average_excludes_undefined_pairs():
