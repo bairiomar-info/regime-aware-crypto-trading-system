@@ -13,7 +13,13 @@ from .classifier import (
 from .hysteresis import HysteresisConfig, HysteresisResult, HysteresisState, update_hysteresis
 from .models import LevelState, MarketState, Transition, TrendState
 from .state import evidence_confidence, transition_for
-from .thresholds import classify_three_level, classify_trend, empirical_quantile
+from .thresholds import (
+    classify_three_level,
+    classify_three_level_hysteresis,
+    classify_trend,
+    classify_trend_hysteresis,
+    empirical_quantile,
+)
 
 __all__ = [
     "Dimension",
@@ -32,7 +38,9 @@ __all__ = [
     "Transition",
     "TrendState",
     "classify_three_level",
+    "classify_three_level_hysteresis",
     "classify_trend",
+    "classify_trend_hysteresis",
     "empirical_quantile",
     "evidence_confidence",
     "transition_for",
