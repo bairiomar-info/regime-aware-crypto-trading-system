@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
+from types import MappingProxyType
 
 from .hysteresis import HysteresisConfig, update_hysteresis
 from .models import LevelState, MarketState, TrendState
@@ -74,6 +75,14 @@ class RegimeClassifierState:
     dimensions: Mapping[str, DimensionTracker] = field(default_factory=dict)
     previous_trend: TrendState | None = None
     state_age: int = 0
+    last_decision_time: datetime | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "dimensions", MappingProxyType(dict(self.dimensions)))
+        if self.state_age < 0:
+            raise ValueError("state_age must be non-negative")
+        if self.last_decision_time is not None:
+            _validate_utc(self.last_decision_time)
 
 
 @dataclass(frozen=True)
@@ -104,14 +113,18 @@ def classify_market_state(
     _validate_utc(decision_time)
     cfg = config or RegimeClassifierConfig()
     old = previous or RegimeClassifierState()
+    if old.last_decision_time is not None and decision_time <= old.last_decision_time:
+        raise ValueError("decision_time must be strictly after previous last_decision_time")
+
     results: list[DimensionClassification] = []
-    trackers: dict[str, DimensionTracker] = {}
+    trackers: dict[str, DimensionTracker] = dict(old.dimensions)
 
     for dimension in Dimension:
         values = history.get(dimension.value, ())
         current_value = current.get(dimension.value)
         dim_cfg = cfg.for_dimension(dimension)
         reference_count = len(values)
+        prior = old.dimensions.get(dimension.value, DimensionTracker())
         if current_value is None or reference_count < dim_cfg.min_observations:
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
@@ -125,7 +138,6 @@ def classify_market_state(
             continue
         assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
 
-        prior = old.dimensions.get(dimension.value, DimensionTracker())
         if dimension is Dimension.TREND:
             candidate = classify_trend_hysteresis(
                 current_value,
@@ -163,18 +175,25 @@ def classify_market_state(
         )
         results.append(DimensionClassification(dimension, stabilized.state, True, reference_count))
 
+    new_state = RegimeClassifierState(
+        dimensions=trackers,
+        previous_trend=old.previous_trend,
+        state_age=old.state_age,
+        last_decision_time=decision_time,
+    )
     complete = all(item.state is not None and item.sufficient_history for item in results)
     if not complete:
-        return RegimeClassificationResult(
-            None,
-            RegimeClassifierState(trackers, old.previous_trend, old.state_age),
-            tuple(results),
-        )
+        return RegimeClassificationResult(None, new_state, tuple(results))
 
     trend_state = TrendState(trackers[Dimension.TREND.value].state)
     transition = transition_for(trend_state, old.previous_trend)
     new_age = 1 if old.previous_trend is None or trend_state is not old.previous_trend else old.state_age + 1
-    new_state = RegimeClassifierState(trackers, trend_state, new_age)
+    new_state = RegimeClassifierState(
+        dimensions=trackers,
+        previous_trend=trend_state,
+        state_age=new_age,
+        last_decision_time=decision_time,
+    )
     confidence = evidence_confidence(evidence or ())
     market_state = MarketState(
         decision_time=decision_time,
