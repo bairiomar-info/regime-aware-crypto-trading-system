@@ -56,13 +56,6 @@ class PointInTimeMembership(BaseModel):
     def validate_interval(self) -> "PointInTimeMembership":
         if self.effective_to is not None and self.effective_to <= self.effective_from:
             raise ValueError("effective_to must be after effective_from")
-        if (
-            self.source_available_at is not None
-            and self.source_available_at > self.effective_from
-        ):
-            raise ValueError(
-                "source_available_at cannot be after the membership effective_from time"
-            )
         return self
 
 
