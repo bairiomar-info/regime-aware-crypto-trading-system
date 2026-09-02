@@ -4,36 +4,19 @@ from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
 from statistics import median
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class LiquiditySnapshot(BaseModel):
-    """Immutable as-of liquidity measurement for one instrument."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
-
-    instrument_id: str = Field(min_length=1)
-    decision_time: object
-    lookback_bars: int = Field(gt=0)
-    observations_used: int = Field(ge=0)
-    coverage_ratio: Decimal
-    median_quote_volume: Decimal | None = None
-    minimum_quote_volume: Decimal | None = None
-    sufficient: bool
-    reason: str = Field(min_length=1)
-
 
 def rolling_quote_volume(
-    quote_volumes: Iterable[Decimal | str],
+    quote_volumes: Iterable[Decimal | str | None],
     *,
     lookback_bars: int,
     minimum_quote_volume: Decimal | str | None = None,
     minimum_coverage: Decimal | str = Decimal("1"),
 ) -> tuple[Decimal | None, Decimal, bool]:
-    """Measure typical quote volume from observations already available as-of T.
+    """Measure typical quote volume from observations available as-of T.
 
-    No timestamps are inferred here: callers must provide an as-of ordered window
-    that excludes the decision candle when that candle is not yet finalized.
+    ``quote_volumes`` represents one already-selected historical lookback window.
+    The decision timestamp is therefore owned by the caller, preventing this
+    low-level calculation from accidentally reaching into future observations.
     """
     if lookback_bars <= 0:
         raise ValueError("lookback_bars must be positive")
@@ -43,6 +26,8 @@ def rolling_quote_volume(
 
     values: list[Decimal] = []
     for value in quote_volumes:
+        if value is None:
+            continue
         try:
             parsed = Decimal(str(value))
         except InvalidOperation as exc:
