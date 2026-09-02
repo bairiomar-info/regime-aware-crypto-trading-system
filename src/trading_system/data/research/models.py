@@ -56,6 +56,11 @@ class PointInTimeMembership(BaseModel):
     def validate_interval(self) -> "PointInTimeMembership":
         if self.effective_to is not None and self.effective_to <= self.effective_from:
             raise ValueError("effective_to must be after effective_from")
+        if (
+            self.source_available_at is not None
+            and self.source_available_at > self.effective_from
+        ):
+            raise ValueError("source_available_at cannot be after effective_from")
         return self
 
 
@@ -83,8 +88,12 @@ class EligibilityDecision(BaseModel):
 
     @model_validator(mode="after")
     def validate_decision(self) -> "EligibilityDecision":
-        if self.evidence_available_at is not None and self.evidence_available_at > self.decision_time:
-            raise ValueError("evidence_available_at cannot be after decision_time")
+        future_evidence = (
+            self.evidence_available_at is not None
+            and self.evidence_available_at > self.decision_time
+        )
+        if future_evidence and self.reasons != (EligibilityReason.FUTURE_INFORMATION,):
+            raise ValueError("future evidence requires the future_information reason")
         if self.eligible and self.reasons != (EligibilityReason.ELIGIBLE,):
             raise ValueError("an eligible decision must contain only the eligible reason")
         if not self.eligible and EligibilityReason.ELIGIBLE in self.reasons:
