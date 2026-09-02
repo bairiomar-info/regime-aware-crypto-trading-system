@@ -47,26 +47,45 @@ Each dimension is classified independently. There is no weighted composite score
 
 Each dimension uses configurable empirical quantiles from its past-only reference window.
 
-The implementation must validate:
+The implementation validates:
 
 - quantiles are within `[0, 1]`
-- lower threshold is strictly below upper threshold
+- `lower_entry < lower_exit < upper_exit < upper_entry`
 - reference history meets the configured minimum observation count
-
-Insufficient reference history produces an explicit unavailable result rather than a fabricated state.
 
 No numerical quantile or lookback is declared optimal in V1. These remain research parameters for later walk-forward evaluation.
 
-## Hysteresis and persistence
+## Threshold hysteresis
 
-A dimension has two concepts:
+Threshold hysteresis is distinct from persistence confirmation.
 
-1. threshold classification, which identifies the state supported by the current observation;
-2. temporal stabilization, which decides whether that candidate becomes the accepted state.
+For level dimensions, the classifier uses four ordered boundaries:
 
-A candidate different from the accepted state must satisfy the configured confirmation requirement before acceptance.
+- `low_entry`
+- `low_exit`
+- `high_exit`
+- `high_entry`
 
-The accepted state and candidate state are retained separately. Repeated accepted-state observations clear the candidate and increase `state_age`.
+The entry boundaries determine a new state when the accepted state is `NORMAL` or absent. Once `LOW` is accepted, the observation must rise to at least `low_exit` before the classifier may leave `LOW`. Once `HIGH` is accepted, the observation must fall to at most `high_exit` before the classifier may leave `HIGH`.
+
+For trend, the same structure is used with:
+
+- `down_entry`
+- `down_exit`
+- `up_exit`
+- `up_entry`
+
+Once `DOWN` is accepted, the value must rise to at least `down_exit` before leaving `DOWN`. Once `UP` is accepted, the value must fall to at most `up_exit` before leaving `UP`.
+
+This creates a persistence band and prevents threshold chatter around the central boundaries.
+
+## Persistence confirmation
+
+After threshold hysteresis determines a candidate state, a separate confirmation rule decides whether that candidate becomes accepted.
+
+A candidate different from the accepted state must satisfy the configured number of consecutive observations before acceptance.
+
+The accepted state and candidate state are retained separately. A reversal to the accepted state clears the candidate and confirmation count.
 
 The first valid observation initializes the accepted state and has `state_age = 1`.
 
@@ -77,6 +96,7 @@ The classifier processes observations sequentially. It never examines future sta
 For each decision time it records:
 
 - accepted dimension states
+- candidate dimension states when pending
 - transition of the directional trend state
 - state age
 - confidence metadata
@@ -162,16 +182,17 @@ Tests must cover:
 1. strict past-only threshold windows
 2. insufficient history
 3. each dimension's state boundaries
-4. first-state initialization
-5. persistence
-6. candidate rejection/reset
-7. accepted-state age
-8. every transition direction
-9. missing dimensions
-10. deterministic repeated execution
-11. mapping-order independence
-12. immutable `MarketState`
-13. no future observation access
+4. threshold hysteresis hold/exit behavior
+5. first-state initialization
+6. persistence confirmation
+7. candidate rejection/reset
+8. accepted-state age
+9. every transition direction
+10. missing dimensions
+11. deterministic repeated execution
+12. mapping-order independence
+13. immutable `MarketState`
+14. no future observation access
 
 ## Research rationale
 
