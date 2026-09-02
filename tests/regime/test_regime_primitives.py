@@ -11,7 +11,9 @@ from trading_system.regime import (
     Transition,
     TrendState,
     classify_three_level,
+    classify_three_level_hysteresis,
     classify_trend,
+    classify_trend_hysteresis,
     empirical_quantile,
     evidence_confidence,
     transition_for,
@@ -41,6 +43,132 @@ def test_trend_classification():
     assert classify_trend("-2", down_entry="-1", up_entry="1") == "DOWN"
     assert classify_trend("0", down_entry="-1", up_entry="1") == "NEUTRAL"
     assert classify_trend("2", down_entry="-1", up_entry="1") == "UP"
+
+
+def test_three_level_hysteresis_holds_accepted_extreme_inside_exit_band():
+    assert (
+        classify_three_level_hysteresis(
+            "9",
+            accepted_state="LOW",
+            low_entry="10",
+            low_exit="12",
+            high_exit="18",
+            high_entry="20",
+        )
+        == "LOW"
+    )
+    assert (
+        classify_three_level_hysteresis(
+            "11",
+            accepted_state="LOW",
+            low_entry="10",
+            low_exit="12",
+            high_exit="18",
+            high_entry="20",
+        )
+        == "LOW"
+    )
+    assert (
+        classify_three_level_hysteresis(
+            "12",
+            accepted_state="LOW",
+            low_entry="10",
+            low_exit="12",
+            high_exit="18",
+            high_entry="20",
+        )
+        == "NORMAL"
+    )
+    assert (
+        classify_three_level_hysteresis(
+            "19",
+            accepted_state="HIGH",
+            low_entry="10",
+            low_exit="12",
+            high_exit="18",
+            high_entry="20",
+        )
+        == "HIGH"
+    )
+    assert (
+        classify_three_level_hysteresis(
+            "18",
+            accepted_state="HIGH",
+            low_entry="10",
+            low_exit="12",
+            high_exit="18",
+            high_entry="20",
+        )
+        == "NORMAL"
+    )
+
+
+def test_trend_hysteresis_holds_direction_until_exit_boundary():
+    assert (
+        classify_trend_hysteresis(
+            "8",
+            accepted_state="UP",
+            down_entry="-20",
+            down_exit="-10",
+            up_exit="10",
+            up_entry="20",
+        )
+        == "UP"
+    )
+    assert (
+        classify_trend_hysteresis(
+            "10",
+            accepted_state="UP",
+            down_entry="-20",
+            down_exit="-10",
+            up_exit="10",
+            up_entry="20",
+        )
+        == "NEUTRAL"
+    )
+    assert (
+        classify_trend_hysteresis(
+            "-8",
+            accepted_state="DOWN",
+            down_entry="-20",
+            down_exit="-10",
+            up_exit="10",
+            up_entry="20",
+        )
+        == "DOWN"
+    )
+    assert (
+        classify_trend_hysteresis(
+            "-10",
+            accepted_state="DOWN",
+            down_entry="-20",
+            down_exit="-10",
+            up_exit="10",
+            up_entry="20",
+        )
+        == "NEUTRAL"
+    )
+
+
+def test_hysteresis_boundary_configuration_is_validated():
+    with pytest.raises(ValueError, match="low_entry < low_exit"):
+        classify_three_level_hysteresis(
+            "5",
+            accepted_state=None,
+            low_entry="10",
+            low_exit="10",
+            high_exit="18",
+            high_entry="20",
+        )
+    with pytest.raises(ValueError, match="down_entry < down_exit"):
+        classify_trend_hysteresis(
+            "0",
+            accepted_state=None,
+            down_entry="-10",
+            down_exit="-10",
+            up_exit="10",
+            up_entry="20",
+        )
 
 
 def test_transition_mapping():
