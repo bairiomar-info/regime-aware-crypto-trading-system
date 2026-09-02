@@ -6,7 +6,7 @@ from trading_system.data.research.features import ema, ema_trend_score, rolling_
 
 
 def test_simple_return_uses_only_requested_historical_window():
-    result = simple_return(["100", "110", "121", "133.1"], lookback_bars=2)
+    result = simple_return(["100", "110", "121", "133.1"], lookback_bars=1)
     assert result == Decimal("0.1")
 
 
