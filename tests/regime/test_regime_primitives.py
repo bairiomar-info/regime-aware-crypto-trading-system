@@ -103,10 +103,10 @@ def test_three_level_hysteresis_holds_accepted_extreme_inside_exit_band():
     )
 
 
-def test_trend_hysteresis_holds_direction_until_exit_boundary():
+def test_trend_hysteresis_exits_up_and_down_at_exit_boundaries():
     assert (
         classify_trend_hysteresis(
-            "8",
+            "12",
             accepted_state="UP",
             down_entry="-20",
             down_exit="-10",
@@ -128,7 +128,7 @@ def test_trend_hysteresis_holds_direction_until_exit_boundary():
     )
     assert (
         classify_trend_hysteresis(
-            "-8",
+            "-12",
             accepted_state="DOWN",
             down_entry="-20",
             down_exit="-10",
