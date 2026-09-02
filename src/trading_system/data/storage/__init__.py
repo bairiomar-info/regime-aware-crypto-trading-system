@@ -33,7 +33,6 @@ __all__ = [
     "CanonicalDatasetManifest",
     "CanonicalDatasetResource",
     "CanonicalizationContract",
-    "CanonicalDatasetResource",
     "CANONICAL_SCHEMA",
     "ChecksumStatus",
     "COMPRESSION",
