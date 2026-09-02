@@ -15,12 +15,12 @@ def transition_for(current: TrendState, previous: TrendState | None) -> Transiti
             TrendState.DOWN: Transition.PERSISTING_DOWN,
         }[current]
     pairs = {
-        (TrendState.UP, TrendState.NEUTRAL): Transition.UP_TO_NEUTRAL,
-        (TrendState.UP, TrendState.DOWN): Transition.UP_TO_DOWN,
-        (TrendState.NEUTRAL, TrendState.UP): Transition.NEUTRAL_TO_UP,
-        (TrendState.NEUTRAL, TrendState.DOWN): Transition.NEUTRAL_TO_DOWN,
-        (TrendState.DOWN, TrendState.UP): Transition.DOWN_TO_UP,
-        (TrendState.DOWN, TrendState.NEUTRAL): Transition.DOWN_TO_NEUTRAL,
+        (TrendState.UP, TrendState.NEUTRAL): Transition.NEUTRAL_TO_UP,
+        (TrendState.UP, TrendState.DOWN): Transition.DOWN_TO_UP,
+        (TrendState.NEUTRAL, TrendState.UP): Transition.UP_TO_NEUTRAL,
+        (TrendState.NEUTRAL, TrendState.DOWN): Transition.DOWN_TO_NEUTRAL,
+        (TrendState.DOWN, TrendState.UP): Transition.UP_TO_DOWN,
+        (TrendState.DOWN, TrendState.NEUTRAL): Transition.NEUTRAL_TO_DOWN,
     }
     return pairs[(current, previous)]
 
