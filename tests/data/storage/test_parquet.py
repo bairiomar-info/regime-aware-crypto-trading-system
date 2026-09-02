@@ -22,8 +22,8 @@ def test_parquet_round_trip_preserves_financial_values(tmp_path):
     write_candles(path, [make_candle(), make_candle(1)])
     rows = read_candles(path)
     assert len(rows) == 2
-    assert rows[0]["open"] == "60000.12345678"
-    assert rows[0]["volume"] == "12.34567890"
+    assert rows[0]["open"] == Decimal("60000.12345678")
+    assert rows[0]["volume"] == Decimal("12.34567890")
     assert rows[0]["trade_count"] == 1234
     assert rows[0]["is_closed"] is True
 
