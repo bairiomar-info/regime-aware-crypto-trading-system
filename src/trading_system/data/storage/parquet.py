@@ -136,6 +136,15 @@ def write_canonical_parquet(
     return ParquetWriteResult(resource=resource, schema=table.schema)
 
 
+def write_candles(path: str | Path, candles: Iterable[Candle]) -> None:
+    """Backward-compatible acquisition/storage entry point.
+
+    The canonical V1 writer is now authoritative; this wrapper preserves the
+    existing acquisition API while intentionally discarding the write result.
+    """
+    write_canonical_parquet(candles, path)
+
+
 def publish_canonical_dataset(
     manifest: CanonicalDatasetManifest,
     manifest_path: str | Path,
