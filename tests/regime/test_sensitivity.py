@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -15,10 +16,12 @@ from trading_system.regime import (
     summarize_states,
 )
 
+T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
 
 def _state(trend: TrendState, transition: Transition, age: int = 1) -> MarketState:
     return MarketState(
-        decision_time=None,
+        decision_time=T0,
         trend=trend,
         volatility=LevelState.NORMAL,
         breadth=LevelState.NORMAL,
