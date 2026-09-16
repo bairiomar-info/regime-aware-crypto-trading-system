@@ -69,6 +69,19 @@ def test_insufficient_assets_returns_unavailable_features() -> None:
     assert snapshot.realized_volatility is None
 
 
+def test_short_asset_history_is_not_silently_dropped() -> None:
+    engine = FeatureEngine()
+    candles = {
+        "BTCUSDT": _series("BTCUSDT", _prices(Decimal("100"), Decimal("1"))),
+        "ETHUSDT": _series("ETHUSDT", _prices(Decimal("200"), Decimal("1"), count=10)),
+        "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"))),
+    }
+    snapshot = engine.compute(candles)
+    assert snapshot.asset_count == 3
+    assert snapshot.trend_score is None
+    assert snapshot.breadth is None
+
+
 def test_misaligned_history_is_rejected() -> None:
     engine = FeatureEngine()
     candles = {
