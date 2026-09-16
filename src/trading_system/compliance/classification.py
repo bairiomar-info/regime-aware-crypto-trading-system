@@ -13,10 +13,12 @@ class AssetCompliance:
     gambling_like: bool = False
 
     def __post_init__(self) -> None:
-        if not self.symbol or self.symbol != self.symbol.upper():
-            raise ValueError("symbol must be non-empty uppercase")
-        if not self.interest_income_ratio.is_finite() or not Decimal("0") <= self.interest_income_ratio <= Decimal("1"):
-            raise ValueError("interest_income_ratio must be within [0, 1]")
+        if not isinstance(self.symbol, str) or not self.symbol or self.symbol != self.symbol.upper():
+            raise ValueError("symbol must be a non-empty uppercase string")
+        if not isinstance(self.interest_income_ratio, Decimal) or not self.interest_income_ratio.is_finite() or not Decimal("0") <= self.interest_income_ratio <= Decimal("1"):
+            raise ValueError("interest_income_ratio must be a finite Decimal within [0, 1]")
+        if not isinstance(self.gambling_like, bool):
+            raise TypeError("gambling_like must be a bool")
 
 
 def validate_asset_compliance(asset: AssetCompliance) -> None:
