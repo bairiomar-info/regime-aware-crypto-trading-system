@@ -11,7 +11,6 @@ from trading_system.data.storage import (
     CanonicalDatasetResource,
     DatasetPublicationError,
     ParquetWriteError,
-    Provenance,
     candles_to_arrow,
     publish_canonical_dataset,
     read_candles,
