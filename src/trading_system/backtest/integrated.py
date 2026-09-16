@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from decimal import Decimal
 
 from trading_system.strategies.interface import ResearchStrategy, evaluate_strategy
-from trading_system.strategies.models import StrategyContext, StrategySignal
+from trading_system.strategies.models import StrategyContext
 from .engine import BacktestConfig, BacktestState, MarketBar, execute_signal
 from .results import BacktestResult, EquityPoint
 
@@ -18,21 +17,18 @@ class IntegratedBacktestInput:
     contexts: tuple[StrategyContext, ...]
 
 
-def run_strategy_backtest(
-    strategy: ResearchStrategy,
-    data: IntegratedBacktestInput,
-    config: BacktestConfig,
-) -> BacktestResult:
-    """Evaluate a strategy at each supplied context and execute only on a later bar."""
+def run_strategy_backtest(strategy: ResearchStrategy, data: IntegratedBacktestInput, config: BacktestConfig) -> BacktestResult:
+    """Evaluate point-in-time contexts and execute resulting signals on the next bar."""
     if not data.bars:
         raise ValueError("bars must not be empty")
     for previous, current in zip(data.bars, data.bars[1:]):
         if current.timestamp <= previous.timestamp:
             raise ValueError("bars must be strictly chronological")
-    signals: list[StrategySignal] = []
-    for context in data.contexts:
-        signals.append(evaluate_strategy(strategy, context))
-    if any(signal.decision_time not in {bar.timestamp for bar in data.bars} for signal in signals):
+    bar_times = {bar.timestamp for bar in data.bars}
+    if len({context.decision_time for context in data.contexts}) != len(data.contexts):
+        raise ValueError("contexts must have unique decision times")
+    signals = tuple(evaluate_strategy(strategy, context) for context in data.contexts)
+    if any(signal.decision_time not in bar_times for signal in signals):
         raise ValueError("every signal decision_time must correspond to a market bar")
 
     state = BacktestState(config.initial_cash, Decimal("0"))
@@ -44,21 +40,12 @@ def run_strategy_backtest(
             if index + 1 >= len(data.bars):
                 raise ValueError("final-bar signal has no executable next bar")
             state = execute_signal(state, signal, data.bars[index + 1], config)
-        equity = state.cash + state.quantity * bar.close
-        curve.append(EquityPoint(bar.timestamp, equity))
+        curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
 
-    final_equity = curve[-1].equity
     peak = curve[0].equity
-    drawdown = Decimal("0")
+    max_dd = Decimal("0")
     for point in curve:
         peak = max(peak, point.equity)
-        drawdown = min(drawdown, point.equity / peak - Decimal("1"))
-    return BacktestResult(
-        config.initial_cash,
-        state.cash,
-        state.quantity,
-        final_equity,
-        final_equity / config.initial_cash - Decimal("1"),
-        drawdown,
-        tuple(curve),
-    )
+        max_dd = min(max_dd, point.equity / peak - Decimal("1"))
+    final = curve[-1].equity
+    return BacktestResult(config.initial_cash, state.cash, state.quantity, final, final / config.initial_cash - Decimal("1"), max_dd, tuple(curve))
