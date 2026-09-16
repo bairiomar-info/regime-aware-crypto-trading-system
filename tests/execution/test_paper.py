@@ -7,7 +7,7 @@ from trading_system.portfolio.state import PortfolioState
 
 
 def test_paper_execution_returns_fill_and_updated_state() -> None:
-    state = PortfolioState(cash=Decimal("1000"), positions=())
+    state = PortfolioState(cash=Decimal("1000"), balances=())
     order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("100"), "test")
     result = execute_paper_order(
         state,
@@ -19,3 +19,5 @@ def test_paper_execution_returns_fill_and_updated_state() -> None:
     )
     assert result.fill.order == order
     assert result.fill.fill_price == Decimal("100")
+    assert result.state.cash == Decimal("900")
+    assert result.state.balances[0].quantity == Decimal("1")
