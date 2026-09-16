@@ -19,6 +19,8 @@ class MultiAssetBar:
 
     def __post_init__(self) -> None:
         require_utc(self.timestamp, name="bar timestamp")
+        if not self.opens:
+            raise ValueError("bar must contain at least one symbol")
         if set(self.opens) != set(self.closes):
             raise ValueError("opens and closes must contain the same symbols")
         for symbol, price in self.opens.items():
@@ -31,14 +33,10 @@ class MultiAssetBar:
                 raise ValueError("close prices must be positive and finite")
 
 
-def apply_orders(
-    state: PortfolioState,
-    orders: tuple[OrderIntent, ...],
-    bar: MultiAssetBar,
-    *,
-    fee_rate: Decimal,
-) -> PortfolioState:
-    """Apply a batch deterministically in symbol order."""
+def apply_orders(state: PortfolioState, orders: tuple[OrderIntent, ...], bar: MultiAssetBar, *, fee_rate: Decimal) -> PortfolioState:
+    """Apply a batch deterministically in symbol/side order."""
+    if not fee_rate.is_finite() or fee_rate < 0 or fee_rate >= 1:
+        raise ValueError("fee_rate must be within [0, 1)")
     current = state
     for order in sorted(orders, key=lambda item: (item.symbol, item.side.value)):
         if order.symbol not in bar.opens:
