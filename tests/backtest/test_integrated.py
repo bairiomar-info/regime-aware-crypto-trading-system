@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from trading_system.backtest.engine import BacktestConfig, MarketBar
 from trading_system.backtest.integrated import IntegratedBacktestInput, run_strategy_backtest
-from trading_system.strategies.momentum import MomentumConfig, MomentumStrategy
+from trading_system.strategies.momentum import TimeSeriesMomentum, TimeSeriesMomentumConfig
 from trading_system.strategies.models import StrategyContext
 
 
@@ -14,11 +14,13 @@ def test_integrated_strategy_backtest_respects_next_bar_execution() -> None:
     )
     contexts = (
         StrategyContext(
-            decision_time=bars[0].timestamp,
+            decision_time=bars[1].timestamp,
             symbol="BTCUSDT",
-            price_history=((bars[0].timestamp, Decimal("100")),),
+            price_history=((bars[0].timestamp, Decimal("100")), (bars[1].timestamp, Decimal("110"))),
         ),
     )
-    strategy = MomentumStrategy(MomentumConfig(lookback=1, threshold=Decimal("0"), target_weight=Decimal("1")))
+    strategy = TimeSeriesMomentum(TimeSeriesMomentumConfig(lookback=1, target_weight=Decimal("1")))
     result = run_strategy_backtest(strategy, IntegratedBacktestInput(bars, contexts), BacktestConfig(Decimal("1000")))
-    assert result.final_equity == Decimal("1090") or result.final_equity == Decimal("1100")
+    # Signal is evaluated at t=1 and therefore can only execute at t=2.
+    assert result.equity_curve[1].equity == Decimal("1000")
+    assert result.final_equity == Decimal("1000")
