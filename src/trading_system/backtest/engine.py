@@ -50,7 +50,7 @@ class BacktestState:
 
 
 def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: MarketBar, config: BacktestConfig) -> BacktestState:
-    """Apply a signal at a later bar; target exposure is based on current equity."""
+    """Apply a target-weight signal at a later bar, including buy and rebalance-down paths."""
     if execution_bar.timestamp <= signal.decision_time:
         raise ValueError("execution must occur strictly after signal decision_time")
     if signal.direction is SignalDirection.NO_TRADE:
@@ -58,20 +58,28 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
     if signal.direction is not SignalDirection.LONG:
         raise ValueError("only LONG and NO_TRADE are supported")
 
-    fill_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
-    current_equity = state.cash + state.quantity * fill_price
+    # Slippage is applied to both sides. LONG signals express a target weight,
+    # so an existing position must be reduced when the target is below it.
+    buy_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
+    sell_price = execution_bar.open * (Decimal("1") - config.slippage_rate)
+    current_equity = state.cash + state.quantity * sell_price
     target_value = current_equity * signal.target_weight
-    desired_quantity = target_value / fill_price
-    additional = desired_quantity - state.quantity
-    if additional <= 0:
+    target_quantity = target_value / buy_price
+    delta = target_quantity - state.quantity
+
+    if delta == 0:
         return state
+    if delta > 0:
+        gross = delta * buy_price
+        fee = gross * config.fee_rate
+        if gross + fee <= state.cash:
+            return BacktestState(state.cash - gross - fee, state.quantity + delta)
+        affordable = state.cash / (buy_price * (Decimal("1") + config.fee_rate))
+        gross = affordable * buy_price
+        fee = gross * config.fee_rate
+        return BacktestState(state.cash - gross - fee, state.quantity + affordable)
 
-    gross = additional * fill_price
+    sold = min(-delta, state.quantity)
+    gross = sold * sell_price
     fee = gross * config.fee_rate
-    if gross + fee <= state.cash:
-        return BacktestState(state.cash - gross - fee, state.quantity + additional)
-
-    affordable = state.cash / (fill_price * (Decimal("1") + config.fee_rate))
-    gross = affordable * fill_price
-    fee = gross * config.fee_rate
-    return BacktestState(state.cash - gross - fee, state.quantity + affordable)
+    return BacktestState(state.cash + gross - fee, state.quantity - sold)
