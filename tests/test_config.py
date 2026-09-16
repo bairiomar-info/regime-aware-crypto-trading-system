@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
@@ -10,7 +12,8 @@ def test_default_configuration_is_long_only_spot_and_shariah_compliant():
     assert config.long_only is True
     assert config.spot_only is True
     assert config.shariah_compliant is True
-    assert config.initial_capital == 1000.0
+    assert config.initial_capital == Decimal("1000")
+    assert isinstance(config.initial_capital, Decimal)
 
 
 def test_initial_capital_must_be_positive():
