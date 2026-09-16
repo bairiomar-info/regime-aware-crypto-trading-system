@@ -14,20 +14,13 @@ from trading_system.research.time import require_utc
 
 class SignalDirection(StrEnum):
     """Directions permitted by the long-only spot research architecture."""
-
     LONG = "LONG"
     NO_TRADE = "NO_TRADE"
 
 
 @dataclass(frozen=True)
 class PortfolioContext:
-    """Minimal immutable portfolio context available to research strategies.
-
-    It deliberately contains no order, fill, or exchange state. Portfolio and
-    risk layers remain responsible for converting a research signal into an
-    allocation or executable plan.
-    """
-
+    """Minimal immutable portfolio context available to research strategies."""
     as_of: datetime
     cash: Decimal
     current_weight: Decimal
@@ -45,12 +38,12 @@ class PortfolioContext:
 @dataclass(frozen=True)
 class StrategyContext:
     """Point-in-time information supplied to a research strategy."""
-
     decision_time: datetime
     symbol: str
     features: FeatureSnapshot
     regime: MarketState | None = None
     portfolio: PortfolioContext | None = None
+    price_history: tuple[tuple[datetime, Decimal], ...] = ()
 
     def __post_init__(self) -> None:
         require_utc(self.decision_time, name="decision_time")
@@ -62,12 +55,24 @@ class StrategyContext:
             raise ValueError("regime must match decision_time")
         if self.portfolio is not None and self.portfolio.as_of > self.decision_time:
             raise ValueError("portfolio context cannot be from the future")
+        if not isinstance(self.price_history, tuple):
+            raise TypeError("price_history must be an immutable tuple")
+        previous: datetime | None = None
+        for timestamp, close in self.price_history:
+            require_utc(timestamp, name="price history timestamp")
+            if previous is not None and timestamp <= previous:
+                raise ValueError("price_history must be strictly chronological")
+            _finite_decimal(close, name="price history close")
+            if close <= 0:
+                raise ValueError("price history closes must be positive")
+            previous = timestamp
+        if self.price_history and self.price_history[-1][0] > self.decision_time:
+            raise ValueError("price_history cannot contain future observations")
 
 
 @dataclass(frozen=True)
 class StrategySignal:
     """A research decision, not an order or an executable allocation."""
-
     decision_time: datetime
     symbol: str
     direction: SignalDirection
