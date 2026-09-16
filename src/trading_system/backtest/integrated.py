@@ -5,8 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from trading_system.compliance.classification import AssetCompliance
+from trading_system.execution.gate import PreTradeConfig, validate_pre_trade
+from trading_system.portfolio.orders import OrderIntent, OrderSide
+from trading_system.portfolio.state import AssetBalance, PortfolioState
 from trading_system.strategies.interface import ResearchStrategy, evaluate_strategy
-from trading_system.strategies.models import StrategyContext
+from trading_system.strategies.models import SignalDirection, StrategyContext
 from .engine import BacktestConfig, BacktestState, MarketBar, execute_signal
 from .results import BacktestResult, EquityPoint
 
@@ -15,10 +19,39 @@ from .results import BacktestResult, EquityPoint
 class IntegratedBacktestInput:
     bars: tuple[MarketBar, ...]
     contexts: tuple[StrategyContext, ...]
+    asset_compliance: AssetCompliance | None = None
 
 
-def run_strategy_backtest(strategy: ResearchStrategy, data: IntegratedBacktestInput, config: BacktestConfig) -> BacktestResult:
-    """Evaluate point-in-time contexts and execute resulting signals on the next bar."""
+def _portfolio_state(state: BacktestState, symbol: str) -> PortfolioState:
+    balances = () if state.quantity == 0 else (AssetBalance(symbol, state.quantity),)
+    return PortfolioState(state.cash, balances)
+
+
+def _pre_trade_order(state: BacktestState, signal, execution_bar: MarketBar) -> tuple[OrderIntent | None, Decimal]:
+    price = execution_bar.open
+    equity = state.cash + state.quantity * price
+    target_quantity = equity * signal.target_weight / price
+    delta = target_quantity - state.quantity
+    if delta > 0:
+        return OrderIntent(signal.symbol, OrderSide.BUY, delta * price, "strategy_target_increase"), price
+    if delta < 0:
+        sold = min(-delta, state.quantity)
+        return OrderIntent(signal.symbol, OrderSide.SELL, sold * price, "strategy_target_decrease"), price
+    return None, price
+
+
+def run_strategy_backtest(
+    strategy: ResearchStrategy,
+    data: IntegratedBacktestInput,
+    config: BacktestConfig,
+    *,
+    pre_trade_config: PreTradeConfig = PreTradeConfig(),
+) -> BacktestResult:
+    """Evaluate point-in-time contexts and execute resulting signals on the next bar.
+
+    Every non-NO_TRADE execution passes through the hard spot, asset-compliance,
+    and risk gate before the simulated fill is applied.
+    """
     if not data.bars:
         raise ValueError("bars must not be empty")
     for previous, current in zip(data.bars, data.bars[1:]):
@@ -43,6 +76,19 @@ def run_strategy_backtest(strategy: ResearchStrategy, data: IntegratedBacktestIn
         if signal is not None:
             if index + 1 >= len(data.bars):
                 raise ValueError("final-bar signal has no executable next bar")
+            if signal.direction is SignalDirection.LONG:
+                if data.asset_compliance is None:
+                    raise ValueError("asset_compliance is required for executable LONG signals")
+                order, price = _pre_trade_order(state, signal, data.bars[index + 1])
+                if order is not None:
+                    validate_pre_trade(
+                        _portfolio_state(state, signal.symbol),
+                        order,
+                        price,
+                        pre_trade_config,
+                        prices={signal.symbol: price},
+                        asset_compliance=data.asset_compliance,
+                    )
             state = execute_signal(state, signal, data.bars[index + 1], config)
         curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
 
