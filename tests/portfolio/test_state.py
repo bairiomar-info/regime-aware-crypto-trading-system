@@ -18,3 +18,13 @@ def test_sell_requires_owned_quantity() -> None:
     order = OrderIntent("BTCUSDT", OrderSide.SELL, Decimal("200"), "test")
     with pytest.raises(ValueError, match="insufficient asset"):
         apply_order_intent(state, order, fill_price=Decimal("100"), fee_rate=Decimal("0"))
+
+
+def test_portfolio_rejects_duplicate_asset_symbols() -> None:
+    with pytest.raises(ValueError, match="unique"):
+        PortfolioState(Decimal("100"), (AssetBalance("BTCUSDT", Decimal("1")), AssetBalance("BTCUSDT", Decimal("2"))))
+
+
+def test_portfolio_rejects_negative_cash() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        PortfolioState(Decimal("-1"), ())
