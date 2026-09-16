@@ -117,6 +117,12 @@ def classify_market_state(
         reference_count = len(values)
         prior = old.dimensions.get(dimension.value, DimensionTracker())
         if current_value is None or reference_count < dim_cfg.min_observations:
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
 
@@ -126,10 +132,22 @@ def classify_market_state(
         upper = empirical_quantile(values, dim_cfg.upper_quantile)
         boundaries = (lower, lower_exit, upper_exit, upper)
         if any(value is None for value in boundaries):
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
         assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
         if not lower < lower_exit < upper_exit < upper:
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
 
@@ -138,6 +156,12 @@ def classify_market_state(
         else:
             candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=lower, low_exit=lower_exit, high_exit=upper_exit, high_entry=upper)
         if candidate is None:
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
 
