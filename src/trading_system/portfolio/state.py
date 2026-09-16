@@ -33,23 +33,15 @@ class PortfolioState:
             raise ValueError("balances must have unique symbols")
 
 
-def apply_order_intent(
-    state: PortfolioState,
-    order: OrderIntent,
-    *,
-    fill_price: Decimal,
-    fee_rate: Decimal,
-) -> PortfolioState:
+def apply_order_intent(state: PortfolioState, order: OrderIntent, *, fill_price: Decimal, fee_rate: Decimal) -> PortfolioState:
     """Apply a fully filled spot order to immutable portfolio state."""
     if not fill_price.is_finite() or fill_price <= 0:
         raise ValueError("fill_price must be positive and finite")
     if not fee_rate.is_finite() or fee_rate < 0 or fee_rate >= 1:
         raise ValueError("fee_rate must be within [0, 1)")
-
     balances = {balance.symbol: balance.quantity for balance in state.balances}
     quantity = order.notional / fill_price
     fee = order.notional * fee_rate
-
     if order.side is OrderSide.BUY:
         total_cost = order.notional + fee
         if total_cost > state.cash:
@@ -64,8 +56,4 @@ def apply_order_intent(
         cash = state.cash + order.notional - fee
     else:
         raise ValueError("unsupported order side")
-
-    return PortfolioState(
-        cash=cash,
-        balances=tuple(AssetBalance(symbol, qty) for symbol, qty in sorted(balances.items()) if qty > 0),
-    )
+    return PortfolioState(cash, tuple(AssetBalance(symbol, qty) for symbol, qty in sorted(balances.items()) if qty > 0))
