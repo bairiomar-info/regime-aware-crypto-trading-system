@@ -16,15 +16,13 @@ def max_drawdown(equity_curve: tuple[EquityPoint, ...]) -> Decimal:
         if point.equity > peak:
             peak = point.equity
         drawdown = point.equity / peak - Decimal("1")
-        if drawdown < worst:
-            worst = drawdown
+        worst = min(worst, drawdown)
     return worst
 
 
 def simple_returns(equity_curve: tuple[EquityPoint, ...]) -> tuple[Decimal, ...]:
     if len(equity_curve) < 2:
         return ()
-    return tuple(
-        current.equity / previous.equity - Decimal("1")
-        for previous, current in zip(equity_curve, equity_curve[1:])
-    )
+    if any(current.equity <= 0 for current in equity_curve):
+        raise ValueError("equity must be positive to calculate simple returns")
+    return tuple(current.equity / previous.equity - Decimal("1") for previous, current in zip(equity_curve, equity_curve[1:]))
