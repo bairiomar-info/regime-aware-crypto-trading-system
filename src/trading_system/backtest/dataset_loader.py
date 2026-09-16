@@ -1,0 +1,32 @@
+"""Narrow boundary for loading canonical candle datasets into research code."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True)
+class CandleDataset:
+    """Validated tabular dataset boundary used by experiment orchestration."""
+
+    rows: tuple[dict[str, Any], ...]
+    source: str
+
+
+def load_candle_dataset(path: str | Path) -> CandleDataset:
+    """Load a parquet dataset without coupling callers to the parquet engine."""
+    target = Path(path)
+    if not target.is_file():
+        raise FileNotFoundError(target)
+    try:
+        import pyarrow.parquet as parquet
+    except ImportError as exc:
+        raise RuntimeError("pyarrow is required to load parquet research datasets") from exc
+
+    table = parquet.read_table(target)
+    rows = tuple(dict(row) for row in table.to_pylist())
+    if not rows:
+        raise ValueError("research dataset must not be empty")
+    return CandleDataset(rows=rows, source=str(target))
