@@ -27,17 +27,18 @@ def _portfolio_state(state: BacktestState, symbol: str) -> PortfolioState:
     return PortfolioState(state.cash, balances)
 
 
-def _pre_trade_order(state: BacktestState, signal, execution_bar: MarketBar) -> tuple[OrderIntent | None, Decimal]:
-    price = execution_bar.open
-    equity = state.cash + state.quantity * price
-    target_quantity = equity * signal.target_weight / price
+def _pre_trade_order(state: BacktestState, signal, execution_bar: MarketBar, config: BacktestConfig) -> tuple[OrderIntent | None, Decimal]:
+    buy_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
+    sell_price = execution_bar.open * (Decimal("1") - config.slippage_rate)
+    equity = state.cash + state.quantity * sell_price
+    target_quantity = equity * signal.target_weight / buy_price
     delta = target_quantity - state.quantity
     if delta > 0:
-        return OrderIntent(signal.symbol, OrderSide.BUY, delta * price, "strategy_target_increase"), price
+        return OrderIntent(signal.symbol, OrderSide.BUY, delta * buy_price, "strategy_target_increase"), buy_price
     if delta < 0:
         sold = min(-delta, state.quantity)
-        return OrderIntent(signal.symbol, OrderSide.SELL, sold * price, "strategy_target_decrease"), price
-    return None, price
+        return OrderIntent(signal.symbol, OrderSide.SELL, sold * sell_price, "strategy_target_decrease"), sell_price
+    return None, buy_price
 
 
 def run_strategy_backtest(
@@ -79,7 +80,7 @@ def run_strategy_backtest(
             if signal.direction is SignalDirection.LONG:
                 if data.asset_compliance is None:
                     raise ValueError("asset_compliance is required for executable LONG signals")
-                order, price = _pre_trade_order(state, signal, data.bars[index + 1])
+                order, price = _pre_trade_order(state, signal, data.bars[index + 1], config)
                 if order is not None:
                     validate_pre_trade(
                         _portfolio_state(state, signal.symbol),
