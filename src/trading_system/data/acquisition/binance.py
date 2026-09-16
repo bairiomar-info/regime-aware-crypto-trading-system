@@ -12,9 +12,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
 
 from ..models import Candle, Instrument, Timeframe
 from ..normalization.binance import BinanceKlineNormalizer, BinanceRawKline
@@ -102,8 +100,10 @@ class BinanceKlineClient:
         for attempt in range(1, self.retry_policy.max_attempts + 1):
             try:
                 status, headers, body = self.transport(url)
-            except (URLError, TimeoutError, OSError) as exc:
+            except (BinanceTransportError, TimeoutError, OSError) as exc:
                 if attempt == self.retry_policy.max_attempts:
+                    if isinstance(exc, BinanceTransportError):
+                        raise
                     raise BinanceTransportError(str(exc)) from exc
                 self.sleeper(self.retry_policy.delay_seconds(attempt))
                 continue
