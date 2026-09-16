@@ -50,7 +50,7 @@ class BacktestState:
 
 
 def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: MarketBar, config: BacktestConfig) -> BacktestState:
-    """Apply a target-weight signal at a later bar, including buy and rebalance-down paths."""
+    """Apply a target-weight signal at a later bar using deterministic execution prices."""
     if execution_bar.timestamp <= signal.decision_time:
         raise ValueError("execution must occur strictly after signal decision_time")
     if signal.direction is SignalDirection.NO_TRADE:
@@ -58,8 +58,6 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
     if signal.direction is not SignalDirection.LONG:
         raise ValueError("only LONG and NO_TRADE are supported")
 
-    # Slippage is applied to both sides. LONG signals express a target weight,
-    # so an existing position must be reduced when the target is below it.
     buy_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
     sell_price = execution_bar.open * (Decimal("1") - config.slippage_rate)
     current_equity = state.cash + state.quantity * sell_price
@@ -67,8 +65,6 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
     target_quantity = target_value / buy_price
     delta = target_quantity - state.quantity
 
-    if delta == 0:
-        return state
     if delta > 0:
         gross = delta * buy_price
         fee = gross * config.fee_rate
@@ -78,8 +74,9 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
         gross = affordable * buy_price
         fee = gross * config.fee_rate
         return BacktestState(state.cash - gross - fee, state.quantity + affordable)
-
-    sold = min(-delta, state.quantity)
-    gross = sold * sell_price
-    fee = gross * config.fee_rate
-    return BacktestState(state.cash + gross - fee, state.quantity - sold)
+    if delta < 0:
+        sold = min(-delta, state.quantity)
+        gross = sold * sell_price
+        fee = gross * config.fee_rate
+        return BacktestState(state.cash + gross - fee, state.quantity - sold)
+    return state
