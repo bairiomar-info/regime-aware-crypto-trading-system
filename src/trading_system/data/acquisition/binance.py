@@ -6,13 +6,14 @@ canonical candles through the existing pure normalizer and never writes data.
 
 from __future__ import annotations
 
+import http.client
 import json
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 from ..models import Candle, Instrument, Timeframe
@@ -130,12 +131,21 @@ class BinanceKlineClient:
 
     @staticmethod
     def _default_transport(url: str) -> tuple[int, Mapping[str, str], bytes]:
-        request = Request(url, headers={"Accept": "application/json"}, method="GET")
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise BinanceTransportError("Binance transport requires an HTTPS URL")
+        connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=15)
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
         try:
-            with urlopen(request, timeout=15) as response:
-                return response.status, dict(response.headers.items()), response.read()
-        except HTTPError as exc:
-            return exc.code, dict(exc.headers.items()), exc.read()
+            connection.request("GET", path, headers={"Accept": "application/json"})
+            response = connection.getresponse()
+            return response.status, dict(response.getheaders()), response.read()
+        except (OSError, TimeoutError) as exc:
+            raise BinanceTransportError(str(exc)) from exc
+        finally:
+            connection.close()
 
     @staticmethod
     def _parse_row(row: Any) -> BinanceRawKline:
