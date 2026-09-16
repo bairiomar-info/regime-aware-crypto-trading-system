@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from .models import StrategyContext, StrategySignal
 
 
+@runtime_checkable
 class ResearchStrategy(Protocol):
     """A deterministic function from point-in-time context to a research signal."""
 
