@@ -17,23 +17,23 @@ class RiskLimits:
 
     def __post_init__(self) -> None:
         for name, value in (("max_position_weight", self.max_position_weight), ("max_order_notional", self.max_order_notional), ("max_gross_exposure", self.max_gross_exposure)):
-            if not value.is_finite() or value <= 0 or value > 1:
-                raise ValueError(f"{name} must be within (0, 1]")
+            if not isinstance(value, Decimal) or not value.is_finite() or value <= 0 or value > 1:
+                raise ValueError(f"{name} must be a finite Decimal within (0, 1]")
 
 
 def portfolio_equity(state: PortfolioState, prices: dict[str, Decimal]) -> Decimal:
     equity = state.cash
     for balance in state.balances:
         price = prices.get(balance.symbol)
-        if price is None or not price.is_finite() or price <= 0:
+        if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
             raise ValueError(f"missing or invalid price for {balance.symbol}")
         equity += balance.quantity * price
     return equity
 
 
 def validate_order_risk(state: PortfolioState, order: OrderIntent, price: Decimal, limits: RiskLimits, *, prices: dict[str, Decimal] | None = None) -> None:
-    if not price.is_finite() or price <= 0:
-        raise ValueError("price must be positive and finite")
+    if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
+        raise ValueError("price must be a positive finite Decimal")
     mark_prices = dict(prices or {})
     mark_prices[order.symbol] = price
     equity = portfolio_equity(state, mark_prices)
