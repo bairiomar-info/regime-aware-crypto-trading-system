@@ -28,6 +28,8 @@ def validate_pre_trade(
     asset_compliance: AssetCompliance | None = None,
 ) -> None:
     """Raise unless an order has explicit hard compliance evidence and passes risk."""
+    if not isinstance(config, PreTradeConfig):
+        raise TypeError("config must be a PreTradeConfig")
     validate_spot_symbol(order.symbol, config.spot)
     if asset_compliance is None:
         raise ValueError("explicit asset compliance evidence is required")
