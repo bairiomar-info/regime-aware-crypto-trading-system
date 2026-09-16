@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from trading_system.strategies.models import SignalDirection, StrategySignal
 from trading_system.research.time import require_utc
+from trading_system.strategies.models import SignalDirection, StrategySignal
 
 
 @dataclass(frozen=True)
@@ -45,46 +45,33 @@ class BacktestState:
     quantity: Decimal
 
     def __post_init__(self) -> None:
-        if self.cash < 0 or self.quantity < 0:
-            raise ValueError("spot state cannot contain negative balances")
+        if not self.cash.is_finite() or not self.quantity.is_finite() or self.cash < 0 or self.quantity < 0:
+            raise ValueError("spot state cannot contain negative or non-finite balances")
 
 
-def execute_signal(
-    state: BacktestState,
-    signal: StrategySignal,
-    execution_bar: MarketBar,
-    config: BacktestConfig,
-) -> BacktestState:
-    """Apply one signal at the explicitly supplied execution bar.
-
-    The caller is responsible for ensuring execution_bar.timestamp is strictly
-    after the signal decision time. This function rejects same/future decision
-    timing so a close cannot accidentally be used as its own fill.
-    """
+def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: MarketBar, config: BacktestConfig) -> BacktestState:
+    """Apply a signal at a later bar; target exposure is based on current equity."""
     if execution_bar.timestamp <= signal.decision_time:
         raise ValueError("execution must occur strictly after signal decision_time")
-
     if signal.direction is SignalDirection.NO_TRADE:
         return state
-
     if signal.direction is not SignalDirection.LONG:
         raise ValueError("only LONG and NO_TRADE are supported")
 
-    price = execution_bar.open * (Decimal("1") + config.slippage_rate)
-    target_value = config.initial_cash * signal.target_weight  # type: ignore[operator]
-    desired_quantity = target_value / price
+    fill_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
+    current_equity = state.cash + state.quantity * fill_price
+    target_value = current_equity * signal.target_weight
+    desired_quantity = target_value / fill_price
     additional = desired_quantity - state.quantity
     if additional <= 0:
         return state
 
-    gross = additional * price
+    gross = additional * fill_price
     fee = gross * config.fee_rate
-    total = gross + fee
-    if total > state.cash:
-        affordable = state.cash / (price * (Decimal("1") + config.fee_rate))
-        gross = affordable * price
-        fee = gross * config.fee_rate
-        additional = affordable
-        total = gross + fee
+    if gross + fee <= state.cash:
+        return BacktestState(state.cash - gross - fee, state.quantity + additional)
 
-    return BacktestState(cash=state.cash - total, quantity=state.quantity + additional)
+    affordable = state.cash / (fill_price * (Decimal("1") + config.fee_rate))
+    gross = affordable * fill_price
+    fee = gross * config.fee_rate
+    return BacktestState(state.cash - gross - fee, state.quantity + affordable)
