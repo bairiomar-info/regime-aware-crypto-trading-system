@@ -131,12 +131,12 @@ class FeatureEngine:
         return Decimal(str(mean(scores)))
 
     def _realized_volatility(self, returns: dict[str, list[Decimal]]) -> Decimal:
-        values = [
-            float(value)
-            for series in returns.values()
-            for value in series[-self.config.volatility_lookback :]
-        ]
-        return Decimal(str(sqrt(sum(value * value for value in values))))
+        """Return mean per-asset realized volatility, avoiding universe-size scaling."""
+        per_asset = []
+        for series in returns.values():
+            values = [float(value) for value in series[-self.config.volatility_lookback :]]
+            per_asset.append(sqrt(sum(value * value for value in values)))
+        return Decimal(str(mean(per_asset)))
 
     def _average_pairwise_correlation(self, returns: dict[str, list[Decimal]]) -> Decimal:
         vectors = {
