@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -13,4 +15,4 @@ class SystemConfig(BaseModel):
     spot_only: bool = True
     shariah_compliant: bool = True
 
-    initial_capital: float = Field(default=1000.0, gt=0)
+    initial_capital: Decimal = Field(default=Decimal("1000"), gt=0)
