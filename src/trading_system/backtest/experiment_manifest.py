@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
+import json
 
 
 @dataclass(frozen=True)
@@ -17,15 +19,23 @@ class ExperimentManifest:
     walk_forward_id: str
 
     def __post_init__(self) -> None:
-        if not self.experiment_id.strip():
-            raise ValueError("experiment_id must not be empty")
-        if not self.dataset_id.strip():
-            raise ValueError("dataset_id must not be empty")
-        if not self.strategy_id.strip():
-            raise ValueError("strategy_id must not be empty")
-        if not self.cost_model_id.strip():
-            raise ValueError("cost_model_id must not be empty")
-        if not self.walk_forward_id.strip():
-            raise ValueError("walk_forward_id must not be empty")
+        for field_name in ("experiment_id", "dataset_id", "strategy_id", "cost_model_id", "walk_forward_id"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty")
         if self.started_at.tzinfo is None:
             raise ValueError("started_at must be timezone-aware")
+
+    def canonical_payload(self) -> dict[str, object]:
+        return {
+            "experiment_id": self.experiment_id,
+            "dataset_id": self.dataset_id,
+            "strategy_id": self.strategy_id,
+            "started_at": self.started_at.isoformat(),
+            "parameters": list(self.parameters),
+            "cost_model_id": self.cost_model_id,
+            "walk_forward_id": self.walk_forward_id,
+        }
+
+    def fingerprint(self) -> str:
+        payload = json.dumps(self.canonical_payload(), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
