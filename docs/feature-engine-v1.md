@@ -18,7 +18,7 @@ For each decision time the engine exposes:
 - **realized_volatility:** mean per-asset root-sum-square of log returns over the volatility window. Averaging per asset prevents the absolute scale from changing merely because the universe contains more assets.
 - **breadth:** fraction of participating assets with a positive latest one-period log return.
 - **cross_sectional_dispersion:** population standard deviation of latest one-period log returns across participating assets.
-- **average_pairwise_correlation:** arithmetic mean of Pearson correlations between participating assets over the correlation window.
+- **average_pairwise_correlation:** arithmetic mean of Pearson correlations between participating assets over the correlation window. If any pair has zero return variance, correlation is undefined and the aggregate is returned as unavailable rather than fabricating a zero.
 
 These formulas are deliberately simple V1 research baselines. No parameter is declared optimal. They must be evaluated through the project's later walk-forward and robustness protocols.
 
@@ -42,7 +42,7 @@ The engine does not fill gaps, interpolate prices, or manufacture returns. Misal
 
 ## Numerical behavior
 
-Log returns require positive close prices. Constant return histories produce zero Pearson correlation rather than an undefined value, because there is no measurable linear co-movement in a zero-variance series. This convention is a research/data convention and should be revisited during validation.
+Log returns require positive close prices. Pearson correlation is undefined for a zero-variance series; the feature is therefore marked unavailable rather than treating undefined correlation as zero.
 
 ## Research boundary
 
