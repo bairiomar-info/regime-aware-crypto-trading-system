@@ -9,7 +9,7 @@ from math import log, sqrt
 from statistics import mean, pstdev
 from typing import Sequence
 
-from trading_system.data.models.candle import Candle
+from trading_system.data.models import Candle
 
 from .models import FeatureSnapshot
 
@@ -43,6 +43,7 @@ class FeatureEngine:
         self.config = config or FeatureEngineConfig()
 
     def compute(self, candles: dict[str, Sequence[Candle]]) -> FeatureSnapshot:
+        """Compute one snapshot using only the supplied endpoint and its history."""
         if not candles:
             raise ValueError("at least one asset series is required")
         series: dict[str, list[Candle]] = {}
@@ -55,11 +56,7 @@ class FeatureEngine:
         if not series:
             raise ValueError("at least one non-empty asset series is required")
 
-        required = max(
-            self.config.trend_lookback + 1,
-            self.config.volatility_lookback + 1,
-            self.config.correlation_lookback + 1,
-        )
+        required = self.required_observations
         decision_time = self._validate_alignment(series, min_length=1)
         if len(series) < self.config.min_assets or any(len(values) < required for values in series.values()):
             return FeatureSnapshot(decision_time, None, None, None, None, None, len(series))
@@ -73,6 +70,35 @@ class FeatureEngine:
         dispersion = Decimal(str(pstdev([float(value) for value in latest.values()])))
         correlation = self._average_pairwise_correlation(returns)
         return FeatureSnapshot(decision_time, trend, volatility, breadth, dispersion, correlation, len(series))
+
+    @property
+    def required_observations(self) -> int:
+        return max(
+            self.config.trend_lookback + 1,
+            self.config.volatility_lookback + 1,
+            self.config.correlation_lookback + 1,
+        )
+
+    def compute_history(self, candles: dict[str, Sequence[Candle]]) -> tuple[FeatureSnapshot, ...]:
+        """Produce a causal feature series from the first fully supported endpoint onward."""
+        if not candles:
+            raise ValueError("at least one asset series is required")
+        series = {symbol: list(values) for symbol, values in candles.items() if values}
+        if not series:
+            return ()
+        lengths = {len(values) for values in series.values()}
+        if len(lengths) != 1:
+            raise ValueError("history computation requires equal-length asset series")
+        self._validate_alignment(series, min_length=1)
+        for symbol, values in series.items():
+            self._validate_series(symbol, values)
+        if len(next(iter(series.values()))) < self.required_observations:
+            return ()
+        snapshots = []
+        for end in range(self.required_observations, len(next(iter(series.values()))) + 1):
+            prefix = {symbol: values[:end] for symbol, values in series.items()}
+            snapshots.append(self.compute(prefix))
+        return tuple(snapshots)
 
     @staticmethod
     def _validate_series(symbol: str, values: list[Candle]) -> None:
