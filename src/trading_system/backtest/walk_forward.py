@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-
-from trading_system.research.time import require_utc
 
 from .engine import MarketBar
 
@@ -33,7 +30,12 @@ def make_walk_forward_windows(
     test_size: int,
     step: int | None = None,
 ) -> tuple[WalkForwardWindow, ...]:
-    """Create non-overlapping train/test windows without look-ahead."""
+    """Create rolling train/test windows without temporal leakage.
+
+    The test segment of each window starts strictly after that window's
+    training segment. ``step`` controls how far the rolling origin advances;
+    it may intentionally create overlapping training histories.
+    """
     if train_size <= 0 or test_size <= 0:
         raise ValueError("train_size and test_size must be positive")
     step = test_size if step is None else step
