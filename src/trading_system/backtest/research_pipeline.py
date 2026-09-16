@@ -12,7 +12,7 @@ from .engine import BacktestConfig, MarketBar
 from .evaluation import OOSWindowResult
 from .oos_runner import run_oos_backtests
 from .regime_stability import RegimeOOSResult, analyze_by_regime
-from .robustness_report import summarize_robustness
+from .robustness_report import RobustnessSummary
 from .walk_forward import make_walk_forward_windows
 
 
@@ -41,27 +41,37 @@ def run_research_pipeline(
         test_size=config.test_size,
         step=config.step,
     )
-    experiments = run_oos_backtests(windows, signal_factory, config.backtest)
-    window_results: tuple[OOSWindowResult, ...] = tuple(
-        window for experiment in experiments for window in experiment.windows
-    )
-    if not window_results:
+    results = run_oos_backtests(windows, signal_factory, config.backtest)
+    if not results:
         raise ValueError("research run produced no OOS windows")
 
-    # Each OOS result corresponds to one walk-forward test segment. Use the
-    # first bar of that segment to assign its point-in-time regime label.
-    regime_inputs: list[tuple[str, OOSWindowResult]] = []
-    for index, window in enumerate(windows):
-        if index >= len(window_results):
-            break
-        regime_inputs.append((regime_labels[bars.index(window.test[0])], window_results[index]))
+    window_results = tuple(
+        OOSWindowResult(index, result.total_return, result.max_drawdown)
+        for index, result in enumerate(results)
+    )
+    regime_inputs = tuple(
+        (regime_labels[bars.index(window.test[0])], window_results[index])
+        for index, window in enumerate(windows)
+    )
+    regimes: tuple[RegimeOOSResult, ...] = analyze_by_regime(regime_inputs)
 
-    regimes: tuple[RegimeOOSResult, ...] = analyze_by_regime(tuple(regime_inputs))
-    robustness = summarize_robustness(window_results)
+    returns = tuple(item.total_return for item in window_results)
+    ordered = tuple(sorted(returns))
+    middle = len(ordered) // 2
+    median = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / Decimal("2")
+    positive = sum(value > 0 for value in returns)
+    robustness = RobustnessSummary(
+        case_count=len(window_results),
+        min_return=min(returns),
+        max_drawdown=max(item.max_drawdown for item in window_results),
+        median_return=median,
+        positive_return_fraction=Decimal(positive) / Decimal(len(returns)),
+    )
+
     return evaluate_alpha_evidence(
-        robustness=robustness,
+        summary=robustness,
         regimes=regimes,
         oos_window_count=len(window_results),
-        worst_oos_return=min(item.total_return for item in window_results),
+        worst_oos_return=min(returns),
         config=config.alpha_gate,
     )
