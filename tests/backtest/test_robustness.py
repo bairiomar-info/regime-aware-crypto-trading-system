@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from trading_system.backtest.engine import BacktestConfig
@@ -14,8 +15,8 @@ def result(return_value: str) -> BacktestResult:
         total_return=Decimal(return_value),
         max_drawdown=Decimal("0.1"),
         equity_curve=(
-            EquityPoint(__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc), Decimal("100")),
-            EquityPoint(__import__("datetime").datetime(2026, 1, 2, tzinfo=__import__("datetime").timezone.utc), Decimal("110")),
+            EquityPoint(datetime(2026, 1, 1, tzinfo=timezone.utc), Decimal("100")),
+            EquityPoint(datetime(2026, 1, 2, tzinfo=timezone.utc), Decimal("110")),
         ),
     )
 
