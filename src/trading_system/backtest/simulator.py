@@ -46,9 +46,8 @@ def run_backtest(
     for point in curve:
         if point.equity > peak:
             peak = point.equity
-        drawdown = (point.equity / peak) - Decimal("1")
-        if drawdown < max_drawdown:
-            max_drawdown = drawdown
+        if peak > 0:
+            max_drawdown = max(max_drawdown, (peak - point.equity) / peak)
 
     return BacktestResult(
         initial_cash=initial,
