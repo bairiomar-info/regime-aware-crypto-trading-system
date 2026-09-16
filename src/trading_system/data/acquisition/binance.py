@@ -7,7 +7,6 @@ canonical candles through the existing pure normalizer and never writes data.
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
