@@ -18,6 +18,8 @@ class AlphaEvidence:
     oos_window_count: int
     worst_oos_return: Decimal
     worst_regime_return: Decimal
+    all_oos_windows_positive: bool
+    all_regimes_positive: bool
 
 
 def evaluate_alpha_evidence(
@@ -30,14 +32,19 @@ def evaluate_alpha_evidence(
     """Produce auditable Alpha evidence without selecting or ranking strategies."""
     if oos_window_count <= 0:
         raise ValueError("oos_window_count must be positive")
+    if worst_oos_return is None:
+        raise ValueError("worst_oos_return is required")
     regime_values = tuple(regimes)
     if not regime_values:
         raise ValueError("regimes must not be empty")
     gate = evaluate_alpha_gate(summary, config)
+    worst_regime_return = min(item.worst_return for item in regime_values)
     return AlphaEvidence(
         gate=gate,
         regimes=regime_values,
         oos_window_count=oos_window_count,
         worst_oos_return=worst_oos_return,
-        worst_regime_return=min(item.worst_return for item in regime_values),
+        worst_regime_return=worst_regime_return,
+        all_oos_windows_positive=worst_oos_return > 0,
+        all_regimes_positive=worst_regime_return > 0,
     )
