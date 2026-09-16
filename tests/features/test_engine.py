@@ -115,3 +115,31 @@ def test_zero_variance_pair_makes_correlation_unavailable() -> None:
     }
     snapshot = engine.compute(candles)
     assert snapshot.average_pairwise_correlation is None
+
+
+def test_compute_history_is_causal_and_starts_at_required_window() -> None:
+    engine = FeatureEngine(FeatureEngineConfig(trend_lookback=4, volatility_lookback=4, correlation_lookback=4))
+    candles = {
+        "BTCUSDT": _series("BTCUSDT", _prices(Decimal("100"), Decimal("1"), count=8)),
+        "ETHUSDT": _series("ETHUSDT", _prices(Decimal("200"), Decimal("2"), count=8)),
+        "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"), count=8)),
+    }
+    history = engine.compute_history(candles)
+    assert len(history) == 5
+    assert history[0].decision_time == candles["BTCUSDT"][4].close_time
+
+    changed_future = {symbol: list(values) for symbol, values in candles.items()}
+    changed_future["BTCUSDT"][-1] = changed_future["BTCUSDT"][-1].model_copy(update={"close": Decimal("999")})
+    changed_history = engine.compute_history(changed_future)
+    assert changed_history[0] == history[0]
+
+
+def test_compute_history_requires_equal_lengths() -> None:
+    engine = FeatureEngine(FeatureEngineConfig(trend_lookback=4, volatility_lookback=4, correlation_lookback=4))
+    candles = {
+        "BTCUSDT": _series("BTCUSDT", _prices(Decimal("100"), Decimal("1"), count=8)),
+        "ETHUSDT": _series("ETHUSDT", _prices(Decimal("200"), Decimal("2"), count=7)),
+        "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"), count=8)),
+    }
+    with pytest.raises(ValueError, match="equal-length"):
+        engine.compute_history(candles)
