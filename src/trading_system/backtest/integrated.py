@@ -11,6 +11,7 @@ from trading_system.portfolio.orders import OrderIntent, OrderSide
 from trading_system.portfolio.state import AssetBalance, PortfolioState
 from trading_system.strategies.interface import ResearchStrategy, evaluate_strategy
 from trading_system.strategies.models import SignalDirection, StrategyContext
+
 from .engine import BacktestConfig, BacktestState, MarketBar, execute_signal
 from .results import BacktestResult, EquityPoint
 
@@ -75,9 +76,9 @@ def run_strategy_backtest(
     for index, bar in enumerate(data.bars):
         signal = by_time.get(bar.timestamp)
         if signal is not None:
-            if index + 1 >= len(data.bars):
-                raise ValueError("final-bar signal has no executable next bar")
             if signal.direction is SignalDirection.LONG:
+                if index + 1 >= len(data.bars):
+                    raise ValueError("final-bar LONG signal has no executable next bar")
                 if data.asset_compliance is None:
                     raise ValueError("asset_compliance is required for executable LONG signals")
                 order, price = _pre_trade_order(state, signal, data.bars[index + 1], config)
@@ -90,7 +91,7 @@ def run_strategy_backtest(
                         prices={signal.symbol: price},
                         asset_compliance=data.asset_compliance,
                     )
-            state = execute_signal(state, signal, data.bars[index + 1], config)
+                state = execute_signal(state, signal, data.bars[index + 1], config)
         curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
 
     peak = curve[0].equity
