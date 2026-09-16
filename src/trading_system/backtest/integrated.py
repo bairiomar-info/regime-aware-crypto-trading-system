@@ -97,6 +97,7 @@ def run_strategy_backtest(
     max_dd = Decimal("0")
     for point in curve:
         peak = max(peak, point.equity)
-        max_dd = min(max_dd, point.equity / peak - Decimal("1"))
+        if peak > 0:
+            max_dd = max(max_dd, (peak - point.equity) / peak)
     final = curve[-1].equity
     return BacktestResult(config.initial_cash, state.cash, state.quantity, final, final / config.initial_cash - Decimal("1"), max_dd, tuple(curve))
