@@ -8,6 +8,7 @@ from .results import EquityPoint
 
 
 def max_drawdown(equity_curve: tuple[EquityPoint, ...]) -> Decimal:
+    """Return maximum drawdown as a positive magnitude in [0, 1]."""
     if not equity_curve:
         raise ValueError("equity_curve must not be empty")
     peak = equity_curve[0].equity
@@ -15,8 +16,9 @@ def max_drawdown(equity_curve: tuple[EquityPoint, ...]) -> Decimal:
     for point in equity_curve:
         if point.equity > peak:
             peak = point.equity
-        drawdown = point.equity / peak - Decimal("1")
-        worst = min(worst, drawdown)
+        if peak > 0:
+            drawdown = (peak - point.equity) / peak
+            worst = max(worst, drawdown)
     return worst
 
 
