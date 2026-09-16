@@ -57,6 +57,8 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
         return state
     if signal.direction is not SignalDirection.LONG:
         raise ValueError("only LONG and NO_TRADE are supported")
+    if signal.target_weight is None:
+        raise ValueError("LONG signal requires target_weight")
 
     buy_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
     sell_price = execution_bar.open * (Decimal("1") - config.slippage_rate)
@@ -68,9 +70,7 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
     if delta > 0:
         gross = delta * buy_price
         fee = gross * config.fee_rate
-        if gross + fee <= state.cash:
-            return BacktestState(state.cash - gross - fee, state.quantity + delta)
-        affordable = state.cash / (buy_price * (Decimal("1") + config.fee_rate))
+        affordable = min(delta, state.cash / (buy_price * (Decimal("1") + config.fee_rate)))
         gross = affordable * buy_price
         fee = gross * config.fee_rate
         return BacktestState(state.cash - gross - fee, state.quantity + affordable)
