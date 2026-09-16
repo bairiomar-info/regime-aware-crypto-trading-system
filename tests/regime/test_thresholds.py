@@ -47,7 +47,7 @@ def test_three_level_hysteresis_holds_low_until_exit() -> None:
 def test_trend_hysteresis_holds_up_until_exit() -> None:
     kwargs = dict(down_entry="-2", down_exit="-1.5", up_exit="1.5", up_entry="2")
     assert classify_trend_hysteresis("1.6", accepted_state="UP", **kwargs) == "UP"
-    assert classify_trend_hysteresis("1.5", accepted_state="UP", **kwargs) == "NORMAL"
+    assert classify_trend_hysteresis("1.5", accepted_state="UP", **kwargs) == "NEUTRAL"
 
 
 def test_boundary_order_is_required() -> None:
