@@ -69,17 +69,15 @@ def test_insufficient_assets_returns_unavailable_features() -> None:
     assert snapshot.realized_volatility is None
 
 
-def test_short_asset_history_is_not_silently_dropped() -> None:
+def test_short_asset_history_is_rejected_instead_of_dropped() -> None:
     engine = FeatureEngine()
     candles = {
         "BTCUSDT": _series("BTCUSDT", _prices(Decimal("100"), Decimal("1"))),
         "ETHUSDT": _series("ETHUSDT", _prices(Decimal("200"), Decimal("1"), count=10)),
         "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"))),
     }
-    snapshot = engine.compute(candles)
-    assert snapshot.asset_count == 3
-    assert snapshot.trend_score is None
-    assert snapshot.breadth is None
+    with pytest.raises(ValueError, match="same candle"):
+        engine.compute(candles)
 
 
 def test_misaligned_history_is_rejected() -> None:
@@ -117,6 +115,19 @@ def test_zero_variance_pair_makes_correlation_unavailable() -> None:
     assert snapshot.average_pairwise_correlation is None
 
 
+def test_realized_volatility_is_not_scaled_by_asset_count() -> None:
+    config = FeatureEngineConfig(trend_lookback=4, volatility_lookback=4, correlation_lookback=4)
+    engine = FeatureEngine(config)
+    candles = {
+        "BTCUSDT": _series("BTCUSDT", _prices(Decimal("100"), Decimal("1"), count=5)),
+        "ETHUSDT": _series("ETHUSDT", _prices(Decimal("200"), Decimal("2"), count=5)),
+        "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"), count=5)),
+    }
+    snapshot = engine.compute(candles)
+    per_asset = engine._realized_volatility({symbol: engine._log_returns(values) for symbol, values in candles.items()})
+    assert snapshot.realized_volatility == per_asset
+
+
 def test_compute_history_is_causal_and_starts_at_required_window() -> None:
     engine = FeatureEngine(FeatureEngineConfig(trend_lookback=4, volatility_lookback=4, correlation_lookback=4))
     candles = {
@@ -125,7 +136,7 @@ def test_compute_history_is_causal_and_starts_at_required_window() -> None:
         "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"), count=8)),
     }
     history = engine.compute_history(candles)
-    assert len(history) == 5
+    assert len(history) == 4
     assert history[0].decision_time == candles["BTCUSDT"][4].close_time
 
     changed_future = {symbol: list(values) for symbol, values in candles.items()}
