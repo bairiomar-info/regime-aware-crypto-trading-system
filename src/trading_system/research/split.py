@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .dataset import ResearchDataset
+from .time import require_utc
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,9 @@ def chronological_split(
     """Split strictly by decision time; no observation crosses the boundary."""
     if dataset.observations == ():
         raise ValueError("dataset must not be empty")
+    require_utc(train_end, name="train_end")
+    if test_end is not None:
+        require_utc(test_end, name="test_end")
     if test_end is not None and test_end <= train_end:
         raise ValueError("test_end must be after train_end")
 
