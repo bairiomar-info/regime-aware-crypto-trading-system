@@ -60,21 +60,19 @@ class FeatureEngine:
             self.config.volatility_lookback + 1,
             self.config.correlation_lookback + 1,
         )
-        usable = {symbol: values for symbol, values in series.items() if len(values) >= required}
-        asset_count = len(usable)
-        if asset_count < self.config.min_assets:
-            decision_time = self._validate_alignment(series, min_length=1)
-            return FeatureSnapshot(decision_time, None, None, None, None, None, asset_count)
+        decision_time = self._validate_alignment(series, min_length=1)
+        if len(series) < self.config.min_assets or any(len(values) < required for values in series.values()):
+            return FeatureSnapshot(decision_time, None, None, None, None, None, len(series))
 
-        decision_time = self._validate_alignment(usable, min_length=required)
-        returns = {symbol: self._log_returns(values) for symbol, values in usable.items()}
+        self._validate_alignment(series, min_length=required)
+        returns = {symbol: self._log_returns(values) for symbol, values in series.items()}
         trend = self._trend_score(returns)
         volatility = self._realized_volatility(returns)
         latest = {symbol: values[-1] for symbol, values in returns.items()}
-        breadth = Decimal(str(sum(value > 0 for value in latest.values()) / asset_count))
+        breadth = Decimal(str(sum(value > 0 for value in latest.values()) / len(series)))
         dispersion = Decimal(str(pstdev([float(value) for value in latest.values()])))
         correlation = self._average_pairwise_correlation(returns)
-        return FeatureSnapshot(decision_time, trend, volatility, breadth, dispersion, correlation, asset_count)
+        return FeatureSnapshot(decision_time, trend, volatility, breadth, dispersion, correlation, len(series))
 
     @staticmethod
     def _validate_series(symbol: str, values: list[Candle]) -> None:
