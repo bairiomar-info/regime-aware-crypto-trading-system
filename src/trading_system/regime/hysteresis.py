@@ -45,6 +45,11 @@ def update_hysteresis(
     A new candidate is accepted after the configured number of consecutive
     observations. If the pending candidate changes, confirmation restarts;
     observations of different candidate states are never combined.
+
+    ``previous_candidate_state`` is optional for compatibility with the
+    primitive API: when omitted, a non-zero confirmation count is treated as
+    belonging to the supplied candidate. Stateful callers should always pass
+    the previous candidate explicitly so candidate changes reset confirmation.
     """
     cfg = config or HysteresisConfig()
     if state_age < 0 or confirmation_count < 0:
@@ -66,7 +71,10 @@ def update_hysteresis(
             status=HysteresisState.ACCEPTED,
         )
 
-    count = confirmation_count + 1 if previous_candidate_state == candidate_state else 1
+    same_pending_candidate = (
+        previous_candidate_state is None or previous_candidate_state == candidate_state
+    )
+    count = confirmation_count + 1 if same_pending_candidate else 1
     if count >= cfg.confirmation_bars:
         return HysteresisResult(
             state=candidate_state,
