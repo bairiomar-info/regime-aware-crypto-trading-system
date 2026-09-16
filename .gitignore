@@ -35,3 +35,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local market-data artifacts
+# Raw parquet datasets are reproducible acquisition outputs and should not be committed.
+data/raw/*.parquet
