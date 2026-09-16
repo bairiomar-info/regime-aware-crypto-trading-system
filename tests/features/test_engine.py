@@ -91,3 +91,14 @@ def test_unfinalized_input_is_rejected() -> None:
 def test_configuration_rejects_too_short_lookbacks() -> None:
     with pytest.raises(ValueError):
         FeatureEngineConfig(trend_lookback=1)
+
+
+def test_zero_variance_pair_makes_correlation_unavailable() -> None:
+    engine = FeatureEngine()
+    candles = {
+        "BTCUSDT": _series("BTCUSDT", _prices(Decimal("100"), Decimal("1"))),
+        "ETHUSDT": _series("ETHUSDT", [Decimal("200")] * 21),
+        "SOLUSDT": _series("SOLUSDT", _prices(Decimal("50"), Decimal("0.5"))),
+    }
+    snapshot = engine.compute(candles)
+    assert snapshot.average_pairwise_correlation is None
