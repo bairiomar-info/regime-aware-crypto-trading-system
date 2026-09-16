@@ -23,9 +23,11 @@ def _bars(count: int = 6) -> tuple[MarketBar, ...]:
 def _config() -> ResearchRunConfig:
     return ResearchRunConfig(
         train_size=2,
-        test_size=1,
-        step=1,
-        backtest=BacktestConfig(initial_cash=Decimal("1000"), fee_rate=Decimal("0"), slippage_rate=Decimal("0")),
+        test_size=2,
+        step=2,
+        backtest=BacktestConfig(
+            initial_cash=Decimal("1000"), fee_rate=Decimal("0"), slippage_rate=Decimal("0")
+        ),
     )
 
 
@@ -43,7 +45,7 @@ def test_full_research_pipeline_produces_alpha_evidence() -> None:
     evidence = run_research_pipeline(bars, signal_factory, _config(), labels)
 
     assert evidence.gate.passed is False
-    assert evidence.oos_window_count == 3
+    assert evidence.oos_window_count == 2
     assert evidence.worst_oos_return == Decimal("0")
     assert evidence.all_oos_windows_positive is False
     assert evidence.all_regimes_positive is False
