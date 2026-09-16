@@ -1,7 +1,7 @@
 """Pure normalization for Binance Spot REST kline payloads."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from ..models import Candle, Instrument, Timeframe
