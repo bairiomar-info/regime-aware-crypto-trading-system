@@ -5,7 +5,7 @@ Research-driven, long-only spot quantitative crypto trading system.
 ## Current architecture
 
 ```text
-Market data → causal features → multidimensional regimes → strategies → portfolio/risk → execution
+Market data → causal features → multidimensional regimes → strategies → portfolio → risk → compliance → execution boundary → backtest/metrics
 ```
 
 The repository is intentionally built in research gates. A layer must be deterministic, tested, and causality-safe before it is used by the next layer.
@@ -20,9 +20,16 @@ The repository is intentionally built in research gates. A layer must be determi
 - Regime transitions, state age, evidence confidence
 - Regime sensitivity, ablation, redundancy, and robustness tooling
 - Causal V1 market feature engine
+- Strategy context/signal contracts with point-in-time validation
+- Immutable multi-asset spot portfolio state and order intents
+- Centralized portfolio-wide risk limits
+- Explicit spot and asset-level compliance checks
+- Mandatory pre-trade gate combining compliance and risk
+- Causal single-asset and multi-asset backtest primitives
+- Deterministic performance result and metric models
 - GitHub Actions test pipeline
 
-### Feature Engine V1
+## Feature Engine V1
 
 The feature engine currently computes five measurements required by the regime layer:
 
@@ -43,6 +50,7 @@ These are research baselines, not claimed-optimal trading indicators. Their para
 - Deterministic outputs
 - Regime classification separated from trading decisions
 - `NO_TRADE` remains a valid downstream risk state
+- Explicit asset compliance evidence is required before pre-trade approval
 
 ## Development
 
