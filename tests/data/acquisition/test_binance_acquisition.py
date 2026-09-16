@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 
@@ -29,9 +30,11 @@ def row(open_ms: int, close_ms: int) -> list[object]:
 
 def test_fetch_builds_correct_kline_request():
     calls: list[str] = []
+
     def transport(url: str):
         calls.append(url)
         return 200, {}, b"[]"
+
     client = BinanceKlineClient(transport=transport)
     assert client.fetch(instrument=INSTRUMENT, timeframe=Timeframe.H1, start=START, end=END) == []
     assert len(calls) == 1
@@ -68,16 +71,18 @@ def test_non_retryable_http_error_is_exposed():
 
 def test_rate_limit_uses_retry_after():
     calls = 0
-    sleeps: list[float] = []
+    sleeps: list[Decimal] = []
+
     def transport(url: str):
         nonlocal calls
         calls += 1
         if calls == 1:
             return 429, {"Retry-After": "3"}, b'{"msg":"too many requests"}'
         return 200, {}, b"[]"
+
     client = BinanceKlineClient(transport=transport, sleeper=sleeps.append, retry_policy=RetryPolicy(max_attempts=2))
     assert client.fetch(instrument=INSTRUMENT, timeframe=Timeframe.H1, start=START, end=END) == []
-    assert sleeps == [3.0]
+    assert sleeps == [Decimal("3")]
     assert calls == 2
 
 
@@ -91,9 +96,11 @@ def test_pagination_advances_by_interval_without_duplicates():
     starts = [1767225600000, 1767229200000]
     pages = [[row(starts[0], starts[0] + 3599999)] * 1000, [row(starts[1], starts[1] + 3599999)]]
     calls: list[str] = []
+
     def transport(url: str):
         calls.append(url)
         return 200, {}, str(pages[len(calls) - 1]).replace("'", '"').encode()
+
     client = BinanceKlineClient(transport=transport)
     candles = client.fetch(instrument=INSTRUMENT, timeframe=Timeframe.H1, start=START, end=datetime(2026, 1, 1, 2, tzinfo=UTC))
     assert len(candles) == 1001
@@ -103,10 +110,12 @@ def test_pagination_advances_by_interval_without_duplicates():
 
 def test_invalid_time_range_is_rejected_before_transport():
     called = False
+
     def transport(url: str):
         nonlocal called
         called = True
         return 200, {}, b"[]"
+
     client = BinanceKlineClient(transport=transport)
     with pytest.raises(ValueError):
         client.fetch(instrument=INSTRUMENT, timeframe=Timeframe.H1, start=END, end=START)
