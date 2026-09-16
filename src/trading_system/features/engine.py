@@ -4,16 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from decimal import Decimal, getcontext
-from math import sqrt
+from decimal import Decimal
+from math import log, sqrt
 from statistics import mean, pstdev
 from typing import Sequence
 
 from trading_system.data.models.candle import Candle
 
 from .models import FeatureSnapshot
-
-getcontext().prec = max(getcontext().prec, 28)
 
 
 @dataclass(frozen=True)
@@ -47,35 +45,34 @@ class FeatureEngine:
     def compute(self, candles: dict[str, Sequence[Candle]]) -> FeatureSnapshot:
         if not candles:
             raise ValueError("at least one asset series is required")
-
         series: dict[str, list[Candle]] = {}
         for symbol, values in candles.items():
             ordered = list(values)
             if not ordered:
                 continue
             self._validate_series(symbol, ordered)
-            if ordered[-1].is_closed is not True:
-                raise ValueError("feature input must end on a finalized candle")
             series[symbol] = ordered
-
         if not series:
             raise ValueError("at least one non-empty asset series is required")
-        decision_time = self._validate_alignment(series)
-        usable = {
-            symbol: values
-            for symbol, values in series.items()
-            if len(values) >= max(self.config.trend_lookback + 1, self.config.volatility_lookback + 1, self.config.correlation_lookback + 1)
-        }
+
+        required = max(
+            self.config.trend_lookback + 1,
+            self.config.volatility_lookback + 1,
+            self.config.correlation_lookback + 1,
+        )
+        usable = {symbol: values for symbol, values in series.items() if len(values) >= required}
         asset_count = len(usable)
         if asset_count < self.config.min_assets:
+            decision_time = self._validate_alignment(series, min_length=1)
             return FeatureSnapshot(decision_time, None, None, None, None, None, asset_count)
 
+        decision_time = self._validate_alignment(usable, min_length=required)
         returns = {symbol: self._log_returns(values) for symbol, values in usable.items()}
         trend = self._trend_score(returns)
         volatility = self._realized_volatility(returns)
         latest = {symbol: values[-1] for symbol, values in returns.items()}
         breadth = Decimal(str(sum(value > 0 for value in latest.values()) / asset_count))
-        dispersion = Decimal(str(pstdev([float(value) for value in latest.values()]))) if asset_count >= 2 else None
+        dispersion = Decimal(str(pstdev([float(value) for value in latest.values()])))
         correlation = self._average_pairwise_correlation(returns)
         return FeatureSnapshot(decision_time, trend, volatility, breadth, dispersion, correlation, asset_count)
 
@@ -95,53 +92,63 @@ class FeatureEngine:
             previous = candle
 
     @staticmethod
-    def _validate_alignment(series: dict[str, list[Candle]]) -> datetime:
-        first = next(iter(series.values()))[-1]
+    def _validate_alignment(series: dict[str, list[Candle]], *, min_length: int) -> datetime:
+        first = next(iter(series.values()))
+        anchor = first[-1]
         for values in series.values():
             last = values[-1]
-            if last.open_time != first.open_time or last.close_time != first.close_time:
+            if last.open_time != anchor.open_time or last.close_time != anchor.close_time:
                 raise ValueError("all asset series must end at the same candle")
-            if last.timeframe != first.timeframe:
+            if last.timeframe != anchor.timeframe:
                 raise ValueError("all asset series must use the same timeframe")
-            if last.instrument.quote_asset != first.instrument.quote_asset:
+            if last.instrument.quote_asset != anchor.instrument.quote_asset:
                 raise ValueError("all asset series must use the same quote asset")
-        if first.close_time.tzinfo is None or first.close_time.utcoffset() != timezone.utc.utcoffset(first.close_time):
+            if len(values) < min_length:
+                raise ValueError("asset series is shorter than the required alignment window")
+            window = values[-min_length:]
+            anchor_times = [(candle.open_time, candle.close_time) for candle in first[-min_length:]]
+            current_times = [(candle.open_time, candle.close_time) for candle in window]
+            if current_times != anchor_times:
+                raise ValueError("asset histories must be timestamp-aligned over the feature window")
+        if anchor.close_time.tzinfo is None or anchor.close_time.utcoffset() != timezone.utc.utcoffset(anchor.close_time):
             raise ValueError("candle times must be UTC")
-        return first.close_time
+        return anchor.close_time
 
     @staticmethod
     def _log_returns(values: Sequence[Candle]) -> list[Decimal]:
         prices = [float(candle.close) for candle in values]
         if any(price <= 0 for price in prices):
             raise ValueError("close prices must be positive")
-        return [Decimal(str(__import__("math").log(prices[i] / prices[i - 1]))) for i in range(1, len(prices))]
+        return [Decimal(str(log(prices[i] / prices[i - 1]))) for i in range(1, len(prices))]
 
     def _trend_score(self, returns: dict[str, list[Decimal]]) -> Decimal:
-        lookback = self.config.trend_lookback
         scores: list[float] = []
         for values in returns.values():
-            window = values[-lookback:]
+            window = values[-self.config.trend_lookback :]
             cumulative = sum(float(value) for value in window)
             scale = sqrt(sum(float(value) ** 2 for value in window))
             scores.append(cumulative / scale if scale > 0 else 0.0)
         return Decimal(str(mean(scores)))
 
     def _realized_volatility(self, returns: dict[str, list[Decimal]]) -> Decimal:
-        window = self.config.volatility_lookback
-        values = [float(value) for series in returns.values() for value in series[-window:]]
+        values = [
+            float(value)
+            for series in returns.values()
+            for value in series[-self.config.volatility_lookback :]
+        ]
         return Decimal(str(sqrt(sum(value * value for value in values))))
 
     def _average_pairwise_correlation(self, returns: dict[str, list[Decimal]]) -> Decimal:
-        window = self.config.correlation_lookback
-        vectors = {symbol: [float(value) for value in values[-window:]] for symbol, values in returns.items()}
+        vectors = {
+            symbol: [float(value) for value in values[-self.config.correlation_lookback :]]
+            for symbol, values in returns.items()
+        }
         correlations: list[float] = []
         symbols = sorted(vectors)
         for index, left in enumerate(symbols):
             for right in symbols[index + 1 :]:
                 correlations.append(self._pearson(vectors[left], vectors[right]))
-        if not correlations:
-            return Decimal("0")
-        return Decimal(str(mean(correlations)))
+        return Decimal(str(mean(correlations))) if correlations else Decimal("0")
 
     @staticmethod
     def _pearson(left: Sequence[float], right: Sequence[float]) -> float:
