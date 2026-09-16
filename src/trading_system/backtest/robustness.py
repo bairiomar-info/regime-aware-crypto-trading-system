@@ -29,18 +29,20 @@ def make_cost_sensitivity_cases(
     """Create deterministic fee/slippage cases without changing strategy inputs."""
     if not initial_cash.is_finite() or initial_cash <= 0:
         raise ValueError("initial_cash must be positive and finite")
-    fees = tuple(fee_rates)
-    slippages = tuple(slippage_rates)
+    fees, slippages = tuple(fee_rates), tuple(slippage_rates)
     if not fees or not slippages:
         raise ValueError("fee_rates and slippage_rates must not be empty")
-    if any(not isinstance(value, Decimal) or not value.is_finite() or value < 0 or value >= 1 for value in (*fees, *slippages)):
+    rates = (*fees, *slippages)
+    if any(not isinstance(value, Decimal) or not value.is_finite() or value < 0 or value >= 1 for value in rates):
         raise ValueError("cost rates must be finite Decimals in [0, 1)")
-    cases: list[SensitivityCase] = []
-    for fee in fees:
-        for slippage in slippages:
-            config = BacktestConfig(initial_cash=initial_cash, fee_rate=fee, slippage_rate=slippage)
-            cases.append(SensitivityCase(f"fee={fee};slippage={slippage}", config))
-    return tuple(cases)
+    return tuple(
+        SensitivityCase(
+            f"fee={fee};slippage={slippage}",
+            BacktestConfig(initial_cash=initial_cash, fee_rate=fee, slippage_rate=slippage),
+        )
+        for fee in fees
+        for slippage in slippages
+    )
 
 
 def summarize_sensitivity(
