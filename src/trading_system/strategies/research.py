@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, runtime_checkable
 
 from .interface import ResearchStrategy
 
 T = TypeVar("T", bound=ResearchStrategy)
 
 
+@runtime_checkable
 class FittableResearchStrategy(ResearchStrategy, Protocol):
     """Strategy that can be fitted exclusively on a training sample."""
 
@@ -20,11 +21,17 @@ class FittableResearchStrategy(ResearchStrategy, Protocol):
         """Return an immutable/frozen strategy for out-of-sample evaluation."""
 
 
-def fit_and_freeze(strategy_type: type[FittableResearchStrategy], training_data: tuple[object, ...]) -> FittableResearchStrategy:
+def fit_and_freeze(
+    strategy_type: type[FittableResearchStrategy],
+    training_data: tuple[object, ...],
+) -> FittableResearchStrategy:
     """Fit on training data and freeze before any out-of-sample evaluation."""
     if not training_data:
         raise ValueError("training_data must not be empty")
     fitted = strategy_type.fit(training_data)
     if not isinstance(fitted, ResearchStrategy):
         raise TypeError("fit must return a ResearchStrategy")
-    return fitted.freeze()
+    frozen = fitted.freeze()
+    if not isinstance(frozen, ResearchStrategy):
+        raise TypeError("freeze must return a ResearchStrategy")
+    return frozen
