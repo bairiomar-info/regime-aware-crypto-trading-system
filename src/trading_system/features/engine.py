@@ -138,7 +138,7 @@ class FeatureEngine:
             per_asset.append(sqrt(sum(value * value for value in values)))
         return Decimal(str(mean(per_asset)))
 
-    def _average_pairwise_correlation(self, returns: dict[str, list[Decimal]]) -> Decimal:
+    def _average_pairwise_correlation(self, returns: dict[str, list[Decimal]]) -> Decimal | None:
         vectors = {
             symbol: [float(value) for value in values[-self.config.correlation_lookback :]]
             for symbol, values in returns.items()
@@ -147,11 +147,14 @@ class FeatureEngine:
         symbols = sorted(vectors)
         for index, left in enumerate(symbols):
             for right in symbols[index + 1 :]:
-                correlations.append(self._pearson(vectors[left], vectors[right]))
-        return Decimal(str(mean(correlations))) if correlations else Decimal("0")
+                correlation = self._pearson(vectors[left], vectors[right])
+                if correlation is None:
+                    return None
+                correlations.append(correlation)
+        return Decimal(str(mean(correlations))) if correlations else None
 
     @staticmethod
-    def _pearson(left: Sequence[float], right: Sequence[float]) -> float:
+    def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
         if len(left) != len(right) or len(left) < 2:
             raise ValueError("correlation requires aligned histories with at least two returns")
         left_mean = mean(left)
@@ -160,5 +163,5 @@ class FeatureEngine:
         left_var = sum((a - left_mean) ** 2 for a in left)
         right_var = sum((b - right_mean) ** 2 for b in right)
         if left_var == 0 or right_var == 0:
-            return 0.0
+            return None
         return numerator / sqrt(left_var * right_var)
