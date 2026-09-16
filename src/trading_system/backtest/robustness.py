@@ -1,4 +1,4 @@
-"""Small deterministic helpers for controlled backtest sensitivity studies."""
+"""Deterministic helpers for controlled backtest sensitivity studies."""
 
 from __future__ import annotations
 
@@ -27,9 +27,17 @@ def make_cost_sensitivity_cases(
     *, initial_cash: Decimal, fee_rates: Iterable[Decimal], slippage_rates: Iterable[Decimal]
 ) -> tuple[SensitivityCase, ...]:
     """Create deterministic fee/slippage cases without changing strategy inputs."""
+    if not initial_cash.is_finite() or initial_cash <= 0:
+        raise ValueError("initial_cash must be positive and finite")
+    fees = tuple(fee_rates)
+    slippages = tuple(slippage_rates)
+    if not fees or not slippages:
+        raise ValueError("fee_rates and slippage_rates must not be empty")
+    if any(not isinstance(value, Decimal) or not value.is_finite() or value < 0 or value >= 1 for value in (*fees, *slippages)):
+        raise ValueError("cost rates must be finite Decimals in [0, 1)")
     cases: list[SensitivityCase] = []
-    for fee in fee_rates:
-        for slippage in slippage_rates:
+    for fee in fees:
+        for slippage in slippages:
             config = BacktestConfig(initial_cash=initial_cash, fee_rate=fee, slippage_rate=slippage)
             cases.append(SensitivityCase(f"fee={fee};slippage={slippage}", config))
     return tuple(cases)
@@ -39,8 +47,11 @@ def summarize_sensitivity(
     cases: Iterable[SensitivityCase], run: Callable[[BacktestConfig], BacktestResult]
 ) -> tuple[SensitivityResult, ...]:
     """Run each controlled case and preserve input ordering for reproducibility."""
+    case_list = tuple(cases)
+    if not case_list:
+        raise ValueError("cases must not be empty")
     results: list[SensitivityResult] = []
-    for case in cases:
+    for case in case_list:
         result = run(case.config)
         results.append(SensitivityResult(case.name, result.total_return, result.max_drawdown))
     return tuple(results)
