@@ -129,7 +129,9 @@ def test_compute_history_is_causal_and_starts_at_required_window() -> None:
     assert history[0].decision_time == candles["BTCUSDT"][4].close_time
 
     changed_future = {symbol: list(values) for symbol, values in candles.items()}
-    changed_future["BTCUSDT"][-1] = changed_future["BTCUSDT"][-1].model_copy(update={"close": Decimal("999")})
+    changed_future["BTCUSDT"][-1] = changed_future["BTCUSDT"][-1].model_copy(
+        update={"close": Decimal("999"), "high": Decimal("999"), "quote_volume": Decimal("999"), "taker_buy_quote_volume": Decimal("999")}
+    )
     changed_history = engine.compute_history(changed_future)
     assert changed_history[0] == history[0]
 
