@@ -29,10 +29,17 @@ class OrderIntent:
 
 
 def order_intents(delta_weights: tuple[tuple[str, Decimal], ...], equity: Decimal) -> tuple[OrderIntent, ...]:
+    """Convert signed target deltas into non-zero BUY/SELL spot intents."""
     if not equity.is_finite() or equity <= 0:
         raise ValueError("equity must be positive and finite")
     result: list[OrderIntent] = []
+    seen: set[str] = set()
     for symbol, delta in delta_weights:
+        if symbol in seen:
+            raise ValueError("symbols must be unique")
+        seen.add(symbol)
+        if not symbol or symbol != symbol.upper():
+            raise ValueError("symbols must be non-empty uppercase identifiers")
         if not delta.is_finite():
             raise ValueError("delta weights must be finite")
         if delta > 0:
