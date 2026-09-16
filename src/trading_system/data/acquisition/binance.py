@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -99,18 +99,13 @@ class BinanceKlineClient:
         candles: list[Candle] = []
 
         while cursor_ms <= end_ms:
-            rows = self._request_page(
-                symbol=instrument.symbol,
-                interval=timeframe.value,
-                start_ms=cursor_ms,
-                end_ms=end_ms,
-            )
+            rows = self._request_page(symbol=instrument.symbol, interval=timeframe.value, start_ms=cursor_ms, end_ms=end_ms)
             if not rows:
                 break
 
             for row in rows:
                 raw = self._parse_row(row)
-                if raw.open_time_ms < self._to_ms(start) or raw.open_time_ms > end_ms:
+                if raw.open_time_ms < cursor_ms or raw.open_time_ms > end_ms:
                     continue
                 candles.append(
                     self.normalizer.normalize(
@@ -133,15 +128,7 @@ class BinanceKlineClient:
         return candles
 
     def _request_page(self, *, symbol: str, interval: str, start_ms: int, end_ms: int) -> list[list[Any]]:
-        query = urlencode(
-            {
-                "symbol": symbol,
-                "interval": interval,
-                "startTime": start_ms,
-                "endTime": end_ms,
-                "limit": self.max_limit,
-            }
-        )
+        query = urlencode({"symbol": symbol, "interval": interval, "startTime": start_ms, "endTime": end_ms, "limit": self.max_limit})
         url = f"{self.base_url}{self.endpoint}?{query}"
 
         for attempt in range(1, self.retry_policy.max_attempts + 1):
@@ -195,17 +182,9 @@ class BinanceKlineClient:
         try:
             values = [row[i] for i in range(11)]
             return BinanceRawKline(
-                open_time_ms=int(values[0]),
-                open=str(values[1]),
-                high=str(values[2]),
-                low=str(values[3]),
-                close=str(values[4]),
-                volume=str(values[5]),
-                close_time_ms=int(values[6]),
-                quote_volume=str(values[7]),
-                trade_count=int(values[8]),
-                taker_buy_base_volume=str(values[9]),
-                taker_buy_quote_volume=str(values[10]),
+                open_time_ms=int(values[0]), open=str(values[1]), high=str(values[2]), low=str(values[3]), close=str(values[4]),
+                volume=str(values[5]), close_time_ms=int(values[6]), quote_volume=str(values[7]), trade_count=int(values[8]),
+                taker_buy_base_volume=str(values[9]), taker_buy_quote_volume=str(values[10]),
             )
         except (TypeError, ValueError, IndexError) as exc:
             raise BinanceAdapterError("Malformed Binance kline row values") from exc
@@ -236,6 +215,8 @@ class BinanceKlineClient:
             raise ValueError("historical-data bounds must be timezone-aware")
         if end <= start:
             raise ValueError("historical-data end must be after start")
+        if start.utcoffset() != timedelta(0) or end.utcoffset() != timedelta(0):
+            raise ValueError("historical-data bounds must use UTC")
 
     @staticmethod
     def _to_ms(value: datetime) -> int:
