@@ -12,11 +12,7 @@ from types import MappingProxyType
 from .hysteresis import HysteresisConfig, update_hysteresis
 from .models import LevelState, MarketState, TrendState
 from .state import evidence_confidence, transition_for
-from .thresholds import (
-    classify_three_level_hysteresis,
-    classify_trend_hysteresis,
-    empirical_quantile,
-)
+from .thresholds import classify_three_level_hysteresis, classify_trend_hysteresis, empirical_quantile
 
 
 class Dimension(str, Enum):
@@ -37,13 +33,8 @@ class DimensionConfig:
     confirmation_bars: int = 2
 
     def __post_init__(self) -> None:
-        if not (
-            Decimal("0") <= self.lower_quantile < self.lower_exit_quantile
-            < self.upper_exit_quantile < self.upper_quantile <= Decimal("1")
-        ):
-            raise ValueError(
-                "quantiles must satisfy 0 <= lower < lower_exit < upper_exit < upper <= 1"
-            )
+        if not (Decimal("0") <= self.lower_quantile < self.lower_exit_quantile < self.upper_exit_quantile < self.upper_quantile <= Decimal("1")):
+            raise ValueError("quantiles must satisfy 0 <= lower < lower_exit < upper_exit < upper <= 1")
         if self.min_observations <= 0:
             raise ValueError("min_observations must be positive")
         if self.confirmation_bars <= 0:
@@ -143,23 +134,9 @@ def classify_market_state(
             continue
 
         if dimension is Dimension.TREND:
-            candidate = classify_trend_hysteresis(
-                current_value,
-                accepted_state=prior.state,
-                down_entry=lower,
-                down_exit=lower_exit,
-                up_exit=upper_exit,
-                up_entry=upper,
-            )
+            candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=lower, down_exit=lower_exit, up_exit=upper_exit, up_entry=upper)
         else:
-            candidate = classify_three_level_hysteresis(
-                current_value,
-                accepted_state=prior.state,
-                low_entry=lower,
-                low_exit=lower_exit,
-                high_exit=upper_exit,
-                high_entry=upper,
-            )
+            candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=lower, low_exit=lower_exit, high_exit=upper_exit, high_entry=upper)
         if candidate is None:
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
@@ -168,6 +145,7 @@ def classify_market_state(
             prior.state,
             candidate,
             confirmation_count=prior.confirmation_count,
+            previous_candidate_state=prior.candidate_state,
             state_age=prior.state_age,
             config=HysteresisConfig(dim_cfg.confirmation_bars),
         )
@@ -179,12 +157,7 @@ def classify_market_state(
         )
         results.append(DimensionClassification(dimension, stabilized.state, True, reference_count))
 
-    new_state = RegimeClassifierState(
-        dimensions=trackers,
-        previous_trend=old.previous_trend,
-        state_age=old.state_age,
-        last_decision_time=decision_time,
-    )
+    new_state = RegimeClassifierState(dimensions=trackers, previous_trend=old.previous_trend, state_age=old.state_age, last_decision_time=decision_time)
     complete = all(item.state is not None and item.sufficient_history for item in results)
     if not complete:
         return RegimeClassificationResult(None, new_state, tuple(results))
@@ -192,12 +165,7 @@ def classify_market_state(
     trend_state = TrendState(trackers[Dimension.TREND.value].state)
     transition = transition_for(trend_state, old.previous_trend)
     new_age = 1 if old.previous_trend is None or trend_state is not old.previous_trend else old.state_age + 1
-    new_state = RegimeClassifierState(
-        dimensions=trackers,
-        previous_trend=trend_state,
-        state_age=new_age,
-        last_decision_time=decision_time,
-    )
+    new_state = RegimeClassifierState(dimensions=trackers, previous_trend=trend_state, state_age=new_age, last_decision_time=decision_time)
     confidence = evidence_confidence(evidence or ())
     market_state = MarketState(
         decision_time=decision_time,
