@@ -4,6 +4,7 @@ from .alpha_evidence import AlphaEvidence, evaluate_alpha_evidence
 from .alpha_gate import AlphaGateConfig, AlphaGateResult, evaluate_alpha_gate
 from .engine import BacktestConfig, BacktestState, MarketBar, execute_signal
 from .evaluation import OOSSummary, OOSWindowResult, summarize_oos
+from .experiment_io import write_experiment_result
 from .experiment_manifest import ExperimentManifest
 from .experiment_result import ExperimentResult, bind_result_to_manifest, fingerprint_experiment_result, serialize_experiment_result
 from .metrics import max_drawdown, mean_return, sharpe_ratio, simple_returns, volatility
@@ -27,5 +28,5 @@ __all__ = [
     "evaluate_alpha_evidence", "evaluate_alpha_gate", "execute_signal", "fingerprint_experiment_result", "make_cost_sensitivity_cases",
     "make_momentum_parameter_cases", "make_walk_forward_windows", "max_drawdown", "mean_return", "run_backtest", "run_momentum_cost_matrix",
     "run_oos_experiments", "serialize_experiment_result", "sharpe_ratio", "simple_returns", "summarize_oos", "summarize_parameter_sensitivity",
-    "summarize_results", "summarize_sensitivity", "volatility",
+    "summarize_results", "summarize_sensitivity", "volatility", "write_experiment_result",
 ]
