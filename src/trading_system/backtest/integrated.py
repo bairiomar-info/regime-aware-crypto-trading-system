@@ -24,12 +24,16 @@ def run_strategy_backtest(strategy: ResearchStrategy, data: IntegratedBacktestIn
     for previous, current in zip(data.bars, data.bars[1:]):
         if current.timestamp <= previous.timestamp:
             raise ValueError("bars must be strictly chronological")
+    if any(context.symbol != data.contexts[0].symbol for context in data.contexts) if data.contexts else False:
+        raise ValueError("all contexts must target the same symbol")
     bar_times = {bar.timestamp for bar in data.bars}
     if len({context.decision_time for context in data.contexts}) != len(data.contexts):
         raise ValueError("contexts must have unique decision times")
     signals = tuple(evaluate_strategy(strategy, context) for context in data.contexts)
     if any(signal.decision_time not in bar_times for signal in signals):
         raise ValueError("every signal decision_time must correspond to a market bar")
+    if any(signal.symbol != data.contexts[i].symbol for i, signal in enumerate(signals)):
+        raise ValueError("strategy signal symbol must match its context")
 
     state = BacktestState(config.initial_cash, Decimal("0"))
     curve: list[EquityPoint] = []
