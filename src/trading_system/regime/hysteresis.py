@@ -36,14 +36,15 @@ def update_hysteresis(
     candidate_state: str,
     *,
     confirmation_count: int = 0,
+    previous_candidate_state: str | None = None,
     state_age: int = 0,
     config: HysteresisConfig | None = None,
 ) -> HysteresisResult:
     """Advance one observation using temporal confirmation only.
 
     A new candidate is accepted after the configured number of consecutive
-    observations. A candidate switch resets confirmation because observations
-    of different candidate states are not consecutive evidence for either one.
+    observations. If the pending candidate changes, confirmation restarts;
+    observations of different candidate states are never combined.
     """
     cfg = config or HysteresisConfig()
     if state_age < 0 or confirmation_count < 0:
@@ -65,13 +66,7 @@ def update_hysteresis(
             status=HysteresisState.ACCEPTED,
         )
 
-    # A non-zero count is meaningful only for the same pending candidate.
-    # The caller supplies the previous candidate separately, so a count alone
-    # cannot safely be carried across a candidate-state change. The classifier
-    # therefore uses this primitive with the previous candidate encoded by the
-    # confirmation_count convention below: a count can only advance when the
-    # proposed candidate matches the pending candidate tracked by the caller.
-    count = confirmation_count + 1
+    count = confirmation_count + 1 if previous_candidate_state == candidate_state else 1
     if count >= cfg.confirmation_bars:
         return HysteresisResult(
             state=candidate_state,
