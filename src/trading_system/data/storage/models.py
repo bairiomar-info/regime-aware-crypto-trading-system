@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -146,7 +147,7 @@ class DatasetIdentity(BaseModel):
             raise ValueError("dataset bounds must be UTC-aware")
         return value
 
-    def model_post_init(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
         if self.end <= self.start:
             raise ValueError("dataset end must be after start")
 
