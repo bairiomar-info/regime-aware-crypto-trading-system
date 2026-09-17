@@ -29,13 +29,16 @@ def run_backtest(
     state = BacktestState(cash=config.initial_cash, quantity=Decimal("0"))
     curve: list[EquityPoint] = []
     signal_by_time = {signal.decision_time: signal for signal in signals}
+    last_bar_time = bars[-1].timestamp
+    terminal_signal = signal_by_time.get(last_bar_time)
+    if terminal_signal is not None and terminal_signal.direction.value != "NO_TRADE":
+        raise ValueError("a signal on the final bar has no later execution bar")
 
     for index, bar in enumerate(bars):
-        signal = signal_by_time.get(bar.timestamp)
-        if signal is not None:
-            if index + 1 >= len(bars):
-                raise ValueError("a signal on the final bar has no later execution bar")
-            state = execute_signal(state, signal, bars[index + 1], config)
+        if index > 0:
+            signal = signal_by_time.get(bars[index - 1].timestamp)
+            if signal is not None:
+                state = execute_signal(state, signal, bar, config)
         equity = state.cash + state.quantity * bar.close
         curve.append(EquityPoint(timestamp=bar.timestamp, equity=equity))
 
