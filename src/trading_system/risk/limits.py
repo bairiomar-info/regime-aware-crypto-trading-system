@@ -34,6 +34,8 @@ def portfolio_equity(state: PortfolioState, prices: dict[str, Decimal]) -> Decim
 def validate_order_risk(state: PortfolioState, order: OrderIntent, price: Decimal, limits: RiskLimits, *, prices: dict[str, Decimal] | None = None) -> None:
     if not isinstance(price, Decimal) or not price.is_finite() or price <= 0:
         raise ValueError("price must be a positive finite Decimal")
+    if not isinstance(order.notional, Decimal) or not order.notional.is_finite() or order.notional <= 0:
+        raise ValueError("order notional must be a positive finite Decimal")
     mark_prices = dict(prices or {})
     mark_prices[order.symbol] = price
     equity = portfolio_equity(state, mark_prices)
@@ -42,7 +44,12 @@ def validate_order_risk(state: PortfolioState, order: OrderIntent, price: Decima
     if order.notional > equity * limits.max_order_notional:
         raise ValueError("order exceeds max_order_notional")
     held = next((b.quantity for b in state.balances if b.symbol == order.symbol), Decimal("0"))
-    projected = held + order.notional / price if order.side is OrderSide.BUY else max(Decimal("0"), held - order.notional / price)
+    if held < 0:
+        raise ValueError("portfolio contains negative asset quantity")
+    quantity = order.notional / price
+    if order.side is OrderSide.SELL and quantity > held:
+        raise ValueError("order exceeds available spot position")
+    projected = held + quantity if order.side is OrderSide.BUY else held - quantity
     if projected * price > equity * limits.max_position_weight:
         raise ValueError("order exceeds max_position_weight")
     current_gross = sum((b.quantity * mark_prices[b.symbol] for b in state.balances), Decimal("0"))
