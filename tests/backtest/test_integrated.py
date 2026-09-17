@@ -46,8 +46,9 @@ def test_integrated_strategy_backtest_respects_next_bar_execution() -> None:
         IntegratedBacktestInput(bars, contexts, asset_compliance=_compliance()),
         BacktestConfig(Decimal("1000")),
     )
+    # Decision at t=1 executes at t=2 open (120), so t=1 remains uninvested.
     assert result.equity_curve[1].equity == Decimal("1000")
-    assert result.final_equity == Decimal("1090.909090909090909090909091")
+    assert result.final_equity == Decimal("1000.000000000000000000000000")
 
 
 def test_terminal_no_trade_signal_does_not_require_next_bar() -> None:
