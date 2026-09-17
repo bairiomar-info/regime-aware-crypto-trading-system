@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from types import MappingProxyType
-from typing import cast
 
 from .hysteresis import HysteresisConfig, update_hysteresis
 from .models import LevelState, MarketState, TrendState
@@ -107,6 +106,7 @@ def classify_market_state(
     old = previous or RegimeClassifierState()
     if old.last_decision_time is not None and decision_time <= old.last_decision_time:
         raise ValueError("decision_time must be strictly after previous last_decision_time")
+
     results: list[DimensionClassification] = []
     trackers: dict[str, DimensionTracker] = dict(old.dimensions)
 
@@ -116,8 +116,14 @@ def classify_market_state(
         dim_cfg = cfg.for_dimension(dimension)
         reference_count = len(values)
         prior = old.dimensions.get(dimension.value, DimensionTracker())
-        if current_value is None or (dim_cfg.min_observations is not None and reference_count < dim_cfg.min_observations):
-            trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
+
+        if current_value is None or reference_count < dim_cfg.min_observations:
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
 
@@ -127,40 +133,101 @@ def classify_market_state(
         upper = empirical_quantile(values, dim_cfg.upper_quantile)
         boundaries = (lower, lower_exit, upper_exit, upper)
         if any(value is None for value in boundaries):
-            trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
+
         lower, lower_exit, upper_exit, upper = boundaries
-        assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
         lower_f = float(lower)
         lower_exit_f = float(lower_exit)
         upper_exit_f = float(upper_exit)
         upper_f = float(upper)
         if not lower_f < lower_exit_f < upper_exit_f < upper_f:
-            trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
 
         if dimension is Dimension.TREND:
-            candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=str(lower), down_exit=str(lower_exit), up_exit=str(upper_exit), up_entry=str(upper))
+            candidate = classify_trend_hysteresis(
+                current_value,
+                accepted_state=prior.state,
+                down_entry=str(lower),
+                down_exit=str(lower_exit),
+                up_exit=str(upper_exit),
+                up_entry=str(upper),
+            )
         else:
-            candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=str(lower), low_exit=str(lower_exit), high_exit=str(upper_exit), high_entry=str(upper))
+            candidate = classify_three_level_hysteresis(
+                current_value,
+                accepted_state=prior.state,
+                low_entry=str(lower),
+                low_exit=str(lower_exit),
+                high_exit=str(upper_exit),
+                high_entry=str(upper),
+            )
+
         if candidate is None:
-            trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
-    dimension = cast(Dimension, locals().get('dimension', None))
-    if dimension is Dimension.TREND:
-        candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=str(lower), down_exit=str(lower_exit), up_exit=str(upper_exit), up_entry=str(upper))
-    else:
-        candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=str(lower), low_exit=str(lower_exit), high_exit=str(upper_exit), high_entry=str(upper))
-    if candidate is None:
-        trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
-        results.append(DimensionClassification(dimension, None, False, reference_count))
+            trackers[dimension.value] = DimensionTracker(
+                state=prior.state,
+                candidate_state=None,
+                confirmation_count=0,
+                state_age=prior.state_age,
+            )
+            results.append(DimensionClassification(dimension, None, False, reference_count))
+            continue
+
+        stabilized = update_hysteresis(
+            prior.state,
+            candidate,
+            confirmation_count=prior.confirmation_count,
+            previous_candidate_state=prior.candidate_state,
+            state_age=prior.state_age,
+            config=HysteresisConfig(dim_cfg.confirmation_bars),
+        )
+        trackers[dimension.value] = DimensionTracker(
+            state=stabilized.state,
+            candidate_state=stabilized.candidate_state,
+            confirmation_count=stabilized.confirmation_count,
+            state_age=stabilized.state_age,
+        )
+        results.append(
+            DimensionClassification(
+                dimension,
+                stabilized.state,
+                True,
+                reference_count,
+            )
+        )
+
+    new_state = RegimeClassifierState(
+        dimensions=trackers,
+        previous_trend=old.previous_trend,
+        state_age=old.state_age,
+        last_decision_time=decision_time,
+    )
+    complete = all(item.state is not None and item.sufficient_history for item in results)
+    if not complete:
         return RegimeClassificationResult(None, new_state, tuple(results))
 
     trend_state = TrendState(trackers[Dimension.TREND.value].state)
     transition = transition_for(trend_state, old.previous_trend)
     new_age = 1 if old.previous_trend is None or trend_state is not old.previous_trend else old.state_age + 1
-    new_state = RegimeClassifierState(dimensions=trackers, previous_trend=trend_state, state_age=new_age, last_decision_time=decision_time)
+    new_state = RegimeClassifierState(
+        dimensions=trackers,
+        previous_trend=trend_state,
+        state_age=new_age,
+        last_decision_time=decision_time,
+    )
     confidence = evidence_confidence(evidence or ())
     market_state = MarketState(
         decision_time=decision_time,
