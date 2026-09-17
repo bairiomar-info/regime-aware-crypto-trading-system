@@ -22,8 +22,8 @@ def run_backtest(
     for previous, current in zip(bars, bars[1:]):
         if current.timestamp <= previous.timestamp:
             raise ValueError("bars must be strictly chronological")
-    for previous, current in zip(signals, signals[1:]):
-        if current.decision_time <= previous.decision_time:
+    for prev_signal, next_signal in zip(signals, signals[1:]):
+        if next_signal.decision_time <= prev_signal.decision_time:
             raise ValueError("signals must be strictly chronological")
 
     state = BacktestState(cash=config.initial_cash, quantity=Decimal("0"))
