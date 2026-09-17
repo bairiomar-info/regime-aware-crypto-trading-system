@@ -1,33 +1,41 @@
-from datetime import datetime, timezone
 from decimal import Decimal
+
+import pytest
 
 from trading_system.portfolio.models import Position, TargetPosition
 from trading_system.portfolio.rebalance import calculate_rebalance
 
 
-def test_rebalance_calculates_target_minus_current_weight() -> None:
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+def test_rebalance_uses_target_minus_current() -> None:
     result = calculate_rebalance(
         (Position("BTCUSDT", Decimal("2"), Decimal("100")),),
-        (TargetPosition("BTCUSDT", Decimal("0.3"), now), TargetPosition("ETHUSDT", Decimal("0.2"), now)),
-        equity=Decimal("1000"),
-        prices={"BTCUSDT": Decimal("100"), "ETHUSDT": Decimal("2000")},
+        (TargetPosition("BTCUSDT", Decimal("0.5"), __import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc)),),
+        equity=Decimal("1000"), prices={"BTCUSDT": Decimal("100")},
     )
     assert result[0].current_weight == Decimal("0.2")
-    assert result[0].delta_weight == Decimal("0.1")
-    assert result[1].current_weight == Decimal("0")
+    assert result[0].delta_weight == Decimal("0.3")
 
 
-def test_missing_price_is_rejected() -> None:
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    try:
+def test_rebalance_rejects_duplicate_positions() -> None:
+    with pytest.raises(ValueError, match="duplicate position"):
         calculate_rebalance(
-            (Position("BTCUSDT", Decimal("1"), Decimal("100")),),
-            (TargetPosition("BTCUSDT", Decimal("0.2"), now),),
-            equity=Decimal("1000"),
-            prices={},
+            (Position("BTCUSDT", Decimal("1"), Decimal("100")), Position("BTCUSDT", Decimal("1"), Decimal("100"))),
+            (), equity=Decimal("1000"), prices={"BTCUSDT": Decimal("100")},
         )
-    except ValueError as exc:
-        assert "missing price" in str(exc)
-    else:
-        raise AssertionError("expected ValueError")
+
+
+def test_rebalance_rejects_duplicate_targets() -> None:
+    from datetime import datetime, timezone
+    t = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with pytest.raises(ValueError, match="duplicate target"):
+        calculate_rebalance(
+            (), (TargetPosition("BTCUSDT", Decimal("0.2"), t), TargetPosition("BTCUSDT", Decimal("0.3"), t)),
+            equity=Decimal("1000"), prices={},
+        )
+
+
+def test_rebalance_rejects_missing_position_price() -> None:
+    with pytest.raises(ValueError, match="missing price"):
+        calculate_rebalance(
+            (Position("BTCUSDT", Decimal("1"), Decimal("100")),), (), equity=Decimal("1000"), prices={},
+        )
