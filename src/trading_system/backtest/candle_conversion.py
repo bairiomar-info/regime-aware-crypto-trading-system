@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import timezone
 from typing import Any
 
 from trading_system.data.models import Candle, Instrument, Timeframe
+
+
+def _normalize_utc(value: Any) -> Any:
+    """Normalize timezone-aware datetimes to the canonical UTC tzinfo object."""
+    if hasattr(value, "tzinfo") and value.tzinfo is not None and value.utcoffset() is not None:
+        return value.astimezone(timezone.utc)
+    return value
 
 
 def rows_to_candles(
@@ -21,7 +29,11 @@ def rows_to_candles(
             instrument=instrument,
             timeframe=timeframe,
             source=source,
-            **row,
+            **{
+                **row,
+                "open_time": _normalize_utc(row["open_time"]),
+                "close_time": _normalize_utc(row["close_time"]),
+            },
         )
         for row in rows
     )

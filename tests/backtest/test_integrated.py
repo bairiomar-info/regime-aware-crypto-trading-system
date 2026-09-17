@@ -28,9 +28,10 @@ def _compliance() -> AssetCompliance:
 
 
 def test_integrated_strategy_backtest_respects_next_bar_execution() -> None:
-    bars = tuple(
-        MarketBar(datetime(2026, 1, 1, h, tzinfo=timezone.utc), Decimal(str(p)), Decimal(str(p)))
-        for h, p in ((0, 100), (1, 110), (2, 120))
+    bars = (
+        MarketBar(datetime(2026, 1, 1, 0, tzinfo=timezone.utc), Decimal("100"), Decimal("100")),
+        MarketBar(datetime(2026, 1, 1, 1, tzinfo=timezone.utc), Decimal("110"), Decimal("110")),
+        MarketBar(datetime(2026, 1, 1, 2, tzinfo=timezone.utc), Decimal("110"), Decimal("120")),
     )
     contexts = (
         StrategyContext(
@@ -46,7 +47,7 @@ def test_integrated_strategy_backtest_respects_next_bar_execution() -> None:
         IntegratedBacktestInput(bars, contexts, asset_compliance=_compliance()),
         BacktestConfig(Decimal("1000")),
     )
-    # Signal is evaluated at t=1 and therefore can only execute at t=2.
+    # Signal is evaluated at t=1 and therefore can only execute at t=2 open.
     assert result.equity_curve[1].equity == Decimal("1000")
     assert result.final_equity == Decimal("1090.909090909090909090909091")
 
@@ -74,7 +75,7 @@ def test_terminal_no_trade_signal_does_not_require_next_bar() -> None:
 
 
 def test_terminal_long_signal_requires_next_bar() -> None:
-    bars = (
+    bars = tuple(
         MarketBar(datetime(2026, 1, 1, h, tzinfo=timezone.utc), Decimal(str(price)), Decimal(str(price)))
         for h, price in ((0, 100), (1, 110))
     )
