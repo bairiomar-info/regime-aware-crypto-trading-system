@@ -22,7 +22,9 @@ def test_long_signal_executes_on_next_bar_open() -> None:
     def signal_factory(decision_bar, history):
         return StrategySignal(
             decision_time=decision_bar.timestamp,
+            symbol="BTCUSDT",
             direction=SignalDirection.LONG,
+            reason="test_long",
             target_weight=Decimal("1"),
         )
 
@@ -32,7 +34,5 @@ def test_long_signal_executes_on_next_bar_open() -> None:
         BacktestConfig(initial_cash=Decimal("1000"), fee_rate=Decimal("0"), slippage_rate=Decimal("0")),
     )[0]
 
-    # The signal is decided on the first OOS bar and executes on the second OOS bar's open (120).
-    # With the test strategy remaining LONG, the final marked equity is 1000 * 120 / 120 = 1000.
     assert result.final_equity == Decimal("1000")
     assert result.final_equity.is_finite()
