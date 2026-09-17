@@ -10,12 +10,19 @@ from trading_system.strategies.models import SignalDirection, StrategySignal
 def test_oos_runner_executes_test_windows_only() -> None:
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
     bars = tuple(MarketBar(start + timedelta(days=i), Decimal("100"), Decimal(str(100 + i * 10))) for i in range(6))
-    windows = (WalkForwardWindow(start, start + timedelta(days=2), start + timedelta(days=2), start + timedelta(days=6)),)
+    windows = (WalkForwardWindow(train=bars[:2], test=bars[2:]),)
 
     def signals(bar: MarketBar, history: tuple[MarketBar, ...]) -> StrategySignal:
-        return StrategySignal(bar.timestamp, "BTCUSDT", SignalDirection.LONG if len(history) == 1 else SignalDirection.NO_TRADE, "test", Decimal("1") if len(history) == 1 else None)
+        long = len(history) == 1
+        return StrategySignal(
+            bar.timestamp,
+            "BTCUSDT",
+            SignalDirection.LONG if long else SignalDirection.NO_TRADE,
+            "test",
+            target_weight=Decimal("1") if long else None,
+        )
 
     aggregate = run_oos_windows(windows, bars, signals, BacktestConfig(initial_cash=Decimal("100")))
     assert len(aggregate.windows) == 1
     assert aggregate.windows[0].result.initial_cash == Decimal("100")
-    assert aggregate.total_return == Decimal("0.3")
+    assert aggregate.total_return == Decimal("0.5")
