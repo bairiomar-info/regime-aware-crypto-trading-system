@@ -13,9 +13,10 @@ def test_portfolio_equity_marks_all_assets() -> None:
 
 
 def test_order_limit_uses_total_equity() -> None:
-    state = PortfolioState(Decimal("100"), (AssetBalance("ETHUSDT", Decimal("8")),))
+    state = PortfolioState(Decimal("250"), (AssetBalance("ETHUSDT", Decimal("5")),))
     order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("250"), "test")
-    validate_order_risk(state, order, Decimal("100"), RiskLimits(max_order_notional=Decimal("0.5")), prices={"ETHUSDT": Decimal("50")})
+    limits = RiskLimits(max_order_notional=Decimal("0.5"))
+    validate_order_risk(state, order, Decimal("100"), limits, prices={"ETHUSDT": Decimal("50")})
 
 
 def test_position_limit_rejects_oversized_target() -> None:

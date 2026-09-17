@@ -11,10 +11,11 @@ def matrix(results: tuple[SensitivityResult, ...]) -> RobustnessMatrix:
         RobustnessCaseResult(result.name, "params", "cost", result) for result in results
     )
     return RobustnessMatrix(cases, RobustnessSummary(
+        case_count=len(results),
         min_return=min(item.total_return for item in results),
+        max_drawdown=max(item.max_drawdown for item in results),
         median_return=sorted(item.total_return for item in results)[len(results) // 2],
-        worst_drawdown=max(item.max_drawdown for item in results),
-        positive_case_fraction=Decimal(sum(item.total_return > 0 for item in results)) / Decimal(len(results)),
+        positive_return_fraction=Decimal(sum(item.total_return > 0 for item in results)) / Decimal(len(results)),
     ))
 
 

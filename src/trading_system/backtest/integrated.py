@@ -70,18 +70,20 @@ def run_strategy_backtest(
     if any(signal.symbol != data.contexts[i].symbol for i, signal in enumerate(signals)):
         raise ValueError("strategy signal symbol must match its context")
 
+    by_time = {signal.decision_time: signal for signal in signals}
+    terminal_signal = by_time.get(data.bars[-1].timestamp)
+    if terminal_signal is not None and terminal_signal.direction is SignalDirection.LONG:
+        raise ValueError("final-bar LONG signal has no executable next bar")
+
     state = BacktestState(config.initial_cash, Decimal("0"))
     curve: list[EquityPoint] = []
-    by_time = {signal.decision_time: signal for signal in signals}
     for index, bar in enumerate(data.bars):
-        signal = by_time.get(bar.timestamp)
-        if signal is not None:
-            if signal.direction is SignalDirection.LONG:
-                if index + 1 >= len(data.bars):
-                    raise ValueError("final-bar LONG signal has no executable next bar")
+        if index > 0:
+            signal = by_time.get(data.bars[index - 1].timestamp)
+            if signal is not None and signal.direction is SignalDirection.LONG:
                 if data.asset_compliance is None:
                     raise ValueError("asset_compliance is required for executable LONG signals")
-                order, price = _pre_trade_order(state, signal, data.bars[index + 1], config)
+                order, price = _pre_trade_order(state, signal, bar, config)
                 if order is not None:
                     validate_pre_trade(
                         _portfolio_state(state, signal.symbol),
@@ -91,7 +93,7 @@ def run_strategy_backtest(
                         prices={signal.symbol: price},
                         asset_compliance=data.asset_compliance,
                     )
-                state = execute_signal(state, signal, data.bars[index + 1], config)
+                state = execute_signal(state, signal, bar, config)
         curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
 
     peak = curve[0].equity
