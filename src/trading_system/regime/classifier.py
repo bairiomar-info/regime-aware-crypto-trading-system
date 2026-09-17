@@ -145,6 +145,7 @@ def classify_market_state(
             candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=lower, low_exit=lower_exit, high_exit=upper_exit, high_entry=upper)
         if candidate is None:
             trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
+    dimension = locals().get('dimension', None)
     if dimension is Dimension.TREND:
         candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=Decimal(lower), down_exit=Decimal(lower_exit), up_exit=Decimal(upper_exit), up_entry=Decimal(upper))
     else:
