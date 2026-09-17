@@ -39,5 +39,10 @@ class RegimeGatedStrategy(ResearchStrategy):
             return StrategySignal(signal.decision_time, signal.symbol, SignalDirection.NO_TRADE, "missing_regime")
         if regime.trend not in self.config.allowed_trends:
             return StrategySignal(signal.decision_time, signal.symbol, SignalDirection.NO_TRADE, "regime_gate_blocked", score=signal.score)
-        weight = signal.target_weight * self.config.target_weight_multiplier
+        tw = signal.target_weight
+        if tw is None:
+            tw = Decimal('0')
+        elif not isinstance(tw, Decimal):
+            tw = Decimal(str(tw))
+        weight = tw * self.config.target_weight_multiplier
         return StrategySignal(signal.decision_time, signal.symbol, SignalDirection.LONG, signal.reason, signal.score, signal.confidence, weight, signal.metadata)

@@ -40,12 +40,13 @@ class WalkForwardConfig:
             raise TypeError("allow_test_overlap must be a bool")
         if isinstance(self.train_size, int) and self.min_train_observations > self.train_size:
             raise ValueError("min_train_observations cannot exceed integer train_size")
-        if (
-            not self.allow_test_overlap
-            and type(self.test_size) is type(self.step_size)
-            and self.step_size < self.test_size
-        ):
-            raise ValueError("step_size smaller than test_size requires allow_test_overlap=True")
+        if not self.allow_test_overlap:
+            if not isinstance(self.test_size, (int, timedelta)) or not isinstance(self.step_size, (int, timedelta)):
+                raise TypeError("test_size and step_size must be int or timedelta")
+            if type(self.test_size) is not type(self.step_size):
+                raise TypeError("test_size and step_size must be of the same type for comparison")
+            if self.step_size < self.test_size:
+                raise ValueError("step_size smaller than test_size requires allow_test_overlap=True")
 
 
 @dataclass(frozen=True)
