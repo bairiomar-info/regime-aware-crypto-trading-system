@@ -12,7 +12,7 @@ from trading_system.data.models.timeframe import Timeframe
 def make_candle(**overrides):
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
     values = dict(
-        instrument=Instrument(symbol="BTCUSDT", exchange="binance"),
+        instrument=Instrument(symbol="BTCUSDT", base_asset="BTC", quote_asset="USDT", exchange="binance"),
         timeframe=Timeframe("1h"),
         open_time=start,
         close_time=start + timedelta(hours=1),
