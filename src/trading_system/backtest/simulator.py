@@ -16,9 +16,9 @@ def run_backtest(
 ) -> BacktestResult:
     """Replay signals against strictly later bars using deterministic fills.
 
-    Equity is recorded at each bar *before* a signal decided on that bar is
-    executed on the next bar. This prevents the future execution fill from
-    leaking backward into the decision-time equity curve.
+    A signal decided at bar ``t`` is queued and executed at bar ``t+1`` before
+    that bar is marked to market. This preserves causal timing while ensuring
+    the equity curve reflects fills at the bar on which they actually occur.
     """
     if not bars:
         raise ValueError("bars must not be empty")
@@ -34,9 +34,12 @@ def run_backtest(
     state = BacktestState(cash=config.initial_cash, quantity=Decimal("0"))
     curve: list[EquityPoint] = []
     signal_by_time = {signal.decision_time: signal for signal in signals}
+    pending: StrategySignal | None = None
 
     for index, bar in enumerate(bars):
-        # Mark the portfolio using only information available at this bar.
+        if pending is not None:
+            state = execute_signal(state, pending, bar, config)
+
         equity = state.cash + state.quantity * bar.close
         curve.append(EquityPoint(timestamp=bar.timestamp, equity=equity))
 
@@ -44,7 +47,9 @@ def run_backtest(
         if signal is not None:
             if index + 1 >= len(bars):
                 raise ValueError("a signal on the final bar has no later execution bar")
-            state = execute_signal(state, signal, bars[index + 1], config)
+            pending = signal
+        else:
+            pending = None
 
     initial = config.initial_cash
     final = curve[-1].equity
