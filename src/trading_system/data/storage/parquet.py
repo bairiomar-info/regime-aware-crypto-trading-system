@@ -232,7 +232,10 @@ def _verify_manifest_resources(manifest: CanonicalDatasetManifest) -> None:
 
 
 def _validate_decimal128(value: Decimal, field_name: str) -> None:
-    if value.as_tuple().exponent < -DECIMAL_SCALE:
+    exp = value.as_tuple().exponent
+    if not isinstance(exp, int):
+        exp = int(exp)
+    if exp < -DECIMAL_SCALE:
         raise ParquetWriteError(
             f"{field_name} value {value} exceeds V1 decimal scale {DECIMAL_SCALE}"
         )

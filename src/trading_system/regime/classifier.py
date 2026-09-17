@@ -106,7 +106,6 @@ def classify_market_state(
     old = previous or RegimeClassifierState()
     if old.last_decision_time is not None and decision_time <= old.last_decision_time:
         raise ValueError("decision_time must be strictly after previous last_decision_time")
-
     results: list[DimensionClassification] = []
     trackers: dict[str, DimensionTracker] = dict(old.dimensions)
 
@@ -116,7 +115,7 @@ def classify_market_state(
         dim_cfg = cfg.for_dimension(dimension)
         reference_count = len(values)
         prior = old.dimensions.get(dimension.value, DimensionTracker())
-        if current_value is None or reference_count < dim_cfg.min_observations:
+        if current_value is None or (dim_cfg.min_observations is not None and reference_count < dim_cfg.min_observations):
             trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
@@ -131,7 +130,11 @@ def classify_market_state(
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
         lower, lower_exit, upper_exit, upper = boundaries
-        if not lower < lower_exit < upper_exit < upper:
+        lower_f = float(lower)
+        lower_exit_f = float(lower_exit)
+        upper_exit_f = float(upper_exit)
+        upper_f = float(upper)
+        if not lower_f < lower_exit_f < upper_exit_f < upper_f:
             trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
