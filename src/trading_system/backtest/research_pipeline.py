@@ -36,7 +36,7 @@ def run_research_pipeline(
         raise ValueError("bars and regime_labels must have equal length")
 
     windows = make_walk_forward_windows(
-        bars,
+        tuple(bars),
         train_size=config.train_size,
         test_size=config.test_size,
         step=config.step,

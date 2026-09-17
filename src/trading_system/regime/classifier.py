@@ -142,16 +142,13 @@ def classify_market_state(
             candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=lower, low_exit=lower_exit, high_exit=upper_exit, high_entry=upper)
         if candidate is None:
             trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
-            results.append(DimensionClassification(dimension, None, False, reference_count))
-            continue
-
-        stabilized = update_hysteresis(prior.state, candidate, confirmation_count=prior.confirmation_count, previous_candidate_state=prior.candidate_state, state_age=prior.state_age, config=HysteresisConfig(dim_cfg.confirmation_bars))
-        trackers[dimension.value] = DimensionTracker(state=stabilized.state, candidate_state=stabilized.candidate_state, confirmation_count=stabilized.confirmation_count, state_age=stabilized.state_age)
-        results.append(DimensionClassification(dimension, stabilized.state, True, reference_count))
-
-    new_state = RegimeClassifierState(dimensions=trackers, previous_trend=old.previous_trend, state_age=old.state_age, last_decision_time=decision_time)
-    complete = all(item.state is not None and item.sufficient_history for item in results)
-    if not complete:
+    if dimension is Dimension.TREND:
+        candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=Decimal(lower), down_exit=Decimal(lower_exit), up_exit=Decimal(upper_exit), up_entry=Decimal(upper))
+    else:
+        candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=Decimal(lower), low_exit=Decimal(lower_exit), high_exit=Decimal(upper_exit), high_entry=Decimal(upper))
+    if candidate is None:
+        trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
+        results.append(DimensionClassification(dimension, None, False, reference_count))
         return RegimeClassificationResult(None, new_state, tuple(results))
 
     trend_state = TrendState(trackers[Dimension.TREND.value].state)
