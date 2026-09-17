@@ -13,9 +13,15 @@ def test_portfolio_equity_marks_all_assets() -> None:
 
 
 def test_order_limit_uses_total_equity() -> None:
-    state = PortfolioState(Decimal("100"), (AssetBalance("ETHUSDT", Decimal("8")),))
-    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("250"), "test")
-    validate_order_risk(state, order, Decimal("100"), RiskLimits(max_order_notional=Decimal("0.5")), prices={"ETHUSDT": Decimal("50")})
+    state = PortfolioState(Decimal("100"), (AssetBalance("ETHUSDT", Decimal("2")),))
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("100"), "test")
+    validate_order_risk(
+        state,
+        order,
+        Decimal("100"),
+        RiskLimits(max_order_notional=Decimal("0.5")),
+        prices={"ETHUSDT": Decimal("50")},
+    )
 
 
 def test_position_limit_rejects_oversized_target() -> None:
@@ -41,9 +47,8 @@ def test_sell_at_exact_holdings_is_allowed() -> None:
 def test_invalid_order_notional_is_rejected() -> None:
     state = PortfolioState(Decimal("1000"), ())
     for notional in (Decimal("0"), Decimal("-1"), Decimal("NaN")):
-        order = OrderIntent("BTCUSDT", OrderSide.BUY, notional, "test")
         with pytest.raises(ValueError, match="notional"):
-            validate_order_risk(state, order, Decimal("100"), RiskLimits())
+            OrderIntent("BTCUSDT", OrderSide.BUY, notional, "test")
 
 
 def test_invalid_mark_price_is_rejected() -> None:
@@ -63,7 +68,7 @@ def test_missing_price_for_existing_holding_is_rejected() -> None:
 
 def test_gross_exposure_limit_is_enforced() -> None:
     state = PortfolioState(Decimal("1000"), (AssetBalance("ETHUSDT", Decimal("5")),))
-    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("600"), "test")
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("800"), "test")
     with pytest.raises(ValueError, match="max_gross_exposure"):
         validate_order_risk(state, order, Decimal("100"), RiskLimits(max_order_notional=Decimal("1"), max_position_weight=Decimal("1"), max_gross_exposure=Decimal("0.9")), prices={"ETHUSDT": Decimal("100")})
 
