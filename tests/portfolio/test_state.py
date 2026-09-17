@@ -59,3 +59,26 @@ def test_fill_price_must_be_finite_and_positive() -> None:
     for price in (Decimal("0"), Decimal("-1"), Decimal("NaN")):
         with pytest.raises(ValueError, match="fill_price"):
             apply_order_intent(state, order, fill_price=price, fee_rate=Decimal("0"))
+
+
+def test_asset_balance_rejects_lowercase_and_invalid_quantity() -> None:
+    for symbol, quantity in (("btcusdt", Decimal("1")), ("BTCUSDT", Decimal("-1")), ("BTCUSDT", Decimal("NaN"))):
+        with pytest.raises(ValueError):
+            AssetBalance(symbol, quantity)
+
+
+def test_buy_and_sell_are_immutable() -> None:
+    initial = PortfolioState(Decimal("1000"), (AssetBalance("BTCUSDT", Decimal("2")),))
+    buy = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("100"), "test")
+    result = apply_order_intent(initial, buy, fill_price=Decimal("100"), fee_rate=Decimal("0"))
+    assert initial.cash == Decimal("1000")
+    assert initial.balances == (AssetBalance("BTCUSDT", Decimal("2")),)
+    assert result.balances == (AssetBalance("BTCUSDT", Decimal("3")),)
+
+
+def test_order_application_is_deterministic() -> None:
+    state = PortfolioState(Decimal("1000"), ())
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("100"), "test")
+    first = apply_order_intent(state, order, fill_price=Decimal("50"), fee_rate=Decimal("0.01"))
+    second = apply_order_intent(state, order, fill_price=Decimal("50"), fee_rate=Decimal("0.01"))
+    assert first == second
