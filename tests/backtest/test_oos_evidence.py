@@ -2,7 +2,6 @@ from decimal import Decimal
 
 import pytest
 
-from trading_system.backtest.alpha_gate import AlphaGateConfig
 from trading_system.backtest.oos_evidence import evaluate_oos_alpha_evidence
 from trading_system.backtest.oos_experiments import OOSExperimentResult
 from trading_system.backtest.evaluation import OOSWindowResult
