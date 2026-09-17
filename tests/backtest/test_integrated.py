@@ -74,7 +74,7 @@ def test_terminal_no_trade_signal_does_not_require_next_bar() -> None:
 
 
 def test_terminal_long_signal_requires_next_bar() -> None:
-    bars = (
+    bars = tuple(
         MarketBar(datetime(2026, 1, 1, h, tzinfo=timezone.utc), Decimal(str(price)), Decimal(str(price)))
         for h, price in ((0, 100), (1, 110))
     )
