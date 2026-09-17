@@ -28,8 +28,10 @@ def test_execution_uses_next_bar_and_tracks_equity() -> None:
         (signal(0),),
         BacktestConfig(Decimal("1000")),
     )
-    assert result.final_equity == Decimal("1100")
-    assert result.total_return == Decimal("0.1")
+    assert result.equity_curve[0].equity == Decimal("1000")
+    assert result.equity_curve[1].equity == Decimal("1000")
+    assert result.final_equity == Decimal("1090.909090909090909090909091")
+    assert result.total_return == Decimal("0.090909090909090909090909091")
 
 
 def test_final_bar_signal_is_rejected() -> None:
