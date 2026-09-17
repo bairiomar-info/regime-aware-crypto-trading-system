@@ -1,9 +1,11 @@
 """Canonical OHLCV candle model."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from trading_system.research.time import require_utc
 
 from .instrument import Instrument
 from .timeframe import Timeframe
@@ -32,12 +34,8 @@ class Candle(BaseModel):
 
     @model_validator(mode="after")
     def validate_structure(self) -> "Candle":
-        if self.open_time.tzinfo is None or self.open_time.utcoffset() is None:
-            raise ValueError("open_time must be timezone-aware")
-        if self.close_time.tzinfo is None or self.close_time.utcoffset() is None:
-            raise ValueError("close_time must be timezone-aware")
-        if self.open_time.tzinfo != timezone.utc or self.close_time.tzinfo != timezone.utc:
-            raise ValueError("open_time and close_time must use UTC")
+        require_utc(self.open_time, name="open_time")
+        require_utc(self.close_time, name="close_time")
         if self.close_time <= self.open_time:
             raise ValueError("close_time must be after open_time")
         if self.high < max(self.open, self.close, self.low):
