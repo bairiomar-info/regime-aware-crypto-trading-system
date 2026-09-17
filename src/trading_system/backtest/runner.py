@@ -32,6 +32,10 @@ def run_backtest(
         decision_bar = bars[index]
         execution_bar = bars[index + 1]
         signal = signal_factory(decision_bar, bars[: index + 1])
+        if not isinstance(signal, StrategySignal):
+            raise TypeError("signal_factory must return a StrategySignal")
+        if signal.decision_time != decision_bar.timestamp:
+            raise ValueError("signal decision_time must match the decision bar timestamp")
         state = execute_signal(state, signal, execution_bar, config)
         equity = state.cash + state.quantity * execution_bar.close
         equity_curve.append(EquityPoint(execution_bar.timestamp, equity))
