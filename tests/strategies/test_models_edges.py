@@ -13,6 +13,22 @@ def features(time: datetime = T) -> FeatureSnapshot:
     return FeatureSnapshot(time, None, None, None, None, None, 1)
 
 
+def valid_regime(time: datetime) -> object:
+    from trading_system.regime.models import LevelState, MarketState, Transition, TrendState
+
+    return MarketState(
+        decision_time=time,
+        trend=TrendState.UP,
+        volatility=LevelState.NORMAL,
+        breadth=LevelState.NORMAL,
+        dispersion=LevelState.NORMAL,
+        correlation=LevelState.NORMAL,
+        transition=Transition.PERSISTING_UP,
+        state_age=1,
+        confidence=Decimal("0.8"),
+    )
+
+
 @pytest.mark.parametrize("symbol", ["", "btcusdt", "BTCUSDT "])
 def test_strategy_signal_requires_uppercase_non_empty_symbol(symbol: str) -> None:
     with pytest.raises(ValueError, match="symbol"):
@@ -62,12 +78,9 @@ def test_strategy_context_rejects_future_features() -> None:
 
 
 def test_strategy_context_rejects_future_regime() -> None:
-    from trading_system.regime.models import LevelState, MarketState, Transition, TrendState
-
     future = T + timedelta(hours=1)
-    regime = MarketState(future, TrendState.UP, LevelState.NEUTRAL, LevelState.NEUTRAL, Transition.STABLE)
     with pytest.raises(ValueError, match="regime"):
-        StrategyContext(T, "BTCUSDT", features(T), regime=regime)
+        StrategyContext(T, "BTCUSDT", features(T), regime=valid_regime(future))
 
 
 def test_strategy_context_rejects_future_portfolio_snapshot() -> None:
