@@ -5,7 +5,7 @@ import pytest
 
 from trading_system.backtest.engine import BacktestConfig, MarketBar
 from trading_system.backtest.experiment import ExperimentCase, run_strategy_experiment_matrix
-from trading_system.backtest.integrated import IntegratedBacktestInput
+from trading_system.compliance.classification import AssetCompliance
 from trading_system.features.models import FeatureSnapshot
 from trading_system.strategies.momentum import TimeSeriesMomentum, TimeSeriesMomentumConfig
 from trading_system.strategies.models import StrategyContext
@@ -45,6 +45,7 @@ def test_strategy_experiment_matrix_uses_canonical_backtest_path() -> None:
         contexts,
         (case,),
         lambda config: TimeSeriesMomentum(config),
+        asset_compliance=AssetCompliance("BTCUSDT", Decimal("0")),
     )
 
     assert results[0].name == "momentum"
@@ -55,12 +56,13 @@ def test_strategy_experiment_matrix_uses_canonical_backtest_path() -> None:
 def test_strategy_experiment_matrix_rejects_empty_inputs() -> None:
     bars = (MarketBar(datetime(2026, 1, 1, tzinfo=timezone.utc), Decimal("100"), Decimal("100")),)
     context = _context(bars[0].timestamp, ((bars[0].timestamp, Decimal("100")),))
+    case = ExperimentCase("x", BacktestConfig(Decimal("1000")))
 
     with pytest.raises(ValueError, match="cases must not be empty"):
         run_strategy_experiment_matrix(bars, (context,), (), lambda config: TimeSeriesMomentum(config))
 
     with pytest.raises(ValueError, match="contexts must not be empty"):
-        run_strategy_experiment_matrix(bars, (), (ExperimentCase("x", BacktestConfig(Decimal("1000"))),), lambda config: TimeSeriesMomentum(config))
+        run_strategy_experiment_matrix(bars, (), (case,), lambda config: TimeSeriesMomentum(config))
 
     with pytest.raises(ValueError, match="bars must not be empty"):
-        run_strategy_experiment_matrix((), (context,), (ExperimentCase("x", BacktestConfig(Decimal("1000"))),), lambda config: TimeSeriesMomentum(config))
+        run_strategy_experiment_matrix((), (context,), (case,), lambda config: TimeSeriesMomentum(config))
