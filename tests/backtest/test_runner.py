@@ -42,3 +42,26 @@ def test_runner_rejects_non_chronological_bars() -> None:
     invalid = (source[0], source[2], source[1])
     with pytest.raises(ValueError, match="strictly chronological"):
         run_backtest(invalid, signal_factory, BacktestConfig(initial_cash=Decimal("100")))
+
+
+def test_runner_rejects_signal_with_mismatched_decision_time() -> None:
+    source = bars()
+
+    def invalid_factory(bar: MarketBar, history: tuple[MarketBar, ...]) -> StrategySignal:
+        return StrategySignal(
+            decision_time=source[2].timestamp,
+            symbol="BTCUSDT",
+            direction=SignalDirection.NO_TRADE,
+            reason="invalid_future_decision",
+        )
+
+    with pytest.raises(ValueError, match="decision_time must match"):
+        run_backtest(source, invalid_factory, BacktestConfig(initial_cash=Decimal("100")))
+
+
+def test_runner_rejects_non_signal_factory_result() -> None:
+    def invalid_factory(bar: MarketBar, history: tuple[MarketBar, ...]) -> object:
+        return object()
+
+    with pytest.raises(TypeError, match="StrategySignal"):
+        run_backtest(bars(), invalid_factory, BacktestConfig(initial_cash=Decimal("100")))
