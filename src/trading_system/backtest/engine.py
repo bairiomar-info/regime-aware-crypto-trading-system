@@ -68,12 +68,11 @@ def execute_signal(state: BacktestState, signal: StrategySignal, execution_bar: 
     delta = target_quantity - state.quantity
 
     if delta > 0:
-        gross = delta * buy_price
-        fee = gross * config.fee_rate
         affordable = min(delta, state.cash / (buy_price * (Decimal("1") + config.fee_rate)))
         gross = affordable * buy_price
         fee = gross * config.fee_rate
-        return BacktestState(state.cash - gross - fee, state.quantity + affordable)
+        remaining_cash = max(Decimal("0"), state.cash - gross - fee)
+        return BacktestState(remaining_cash, state.quantity + affordable)
     if delta < 0:
         sold = min(-delta, state.quantity)
         gross = sold * sell_price
