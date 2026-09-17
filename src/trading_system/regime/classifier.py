@@ -131,6 +131,7 @@ def classify_market_state(
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
         lower, lower_exit, upper_exit, upper = boundaries
+        assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
         lower_f = float(lower)
         lower_exit_f = float(lower_exit)
         upper_exit_f = float(upper_exit)
@@ -141,16 +142,16 @@ def classify_market_state(
             continue
 
         if dimension is Dimension.TREND:
-            candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=lower, down_exit=lower_exit, up_exit=upper_exit, up_entry=upper)
+            candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=str(lower), down_exit=str(lower_exit), up_exit=str(upper_exit), up_entry=str(upper))
         else:
-            candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=lower, low_exit=lower_exit, high_exit=upper_exit, high_entry=upper)
+            candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=str(lower), low_exit=str(lower_exit), high_exit=str(upper_exit), high_entry=str(upper))
         if candidate is None:
             trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
     dimension = cast(Dimension, locals().get('dimension', None))
     if dimension is Dimension.TREND:
-        candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=Decimal(lower), down_exit=Decimal(lower_exit), up_exit=Decimal(upper_exit), up_entry=Decimal(upper))
+        candidate = classify_trend_hysteresis(current_value, accepted_state=prior.state, down_entry=str(lower), down_exit=str(lower_exit), up_exit=str(upper_exit), up_entry=str(upper))
     else:
-        candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=Decimal(lower), low_exit=Decimal(lower_exit), high_exit=Decimal(upper_exit), high_entry=Decimal(upper))
+        candidate = classify_three_level_hysteresis(current_value, accepted_state=prior.state, low_entry=str(lower), low_exit=str(lower_exit), high_exit=str(upper_exit), high_entry=str(upper))
     if candidate is None:
         trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
         results.append(DimensionClassification(dimension, None, False, reference_count))
