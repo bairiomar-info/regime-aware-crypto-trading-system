@@ -21,15 +21,14 @@ def _bars() -> tuple[MarketBar, ...]:
 
 def test_oos_runner_executes_real_test_segment_causally() -> None:
     bars = _bars()
-    window = WalkForwardWindow(
-        train=(bars[0],),
-        test=bars[1:],
-    )
+    window = WalkForwardWindow(train=(bars[0],), test=bars[1:])
 
     def signal_factory(decision_bar, history):
         return StrategySignal(
             decision_time=decision_bar.timestamp,
+            symbol="BTCUSDT",
             direction=SignalDirection.NO_TRADE,
+            reason="test_no_trade",
             target_weight=None,
         )
 
