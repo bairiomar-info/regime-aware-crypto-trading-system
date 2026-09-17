@@ -10,7 +10,7 @@ from trading_system.execution.gate import PreTradeConfig, validate_pre_trade
 from trading_system.portfolio.orders import OrderIntent, OrderSide
 from trading_system.portfolio.state import AssetBalance, PortfolioState
 from trading_system.strategies.interface import ResearchStrategy, evaluate_strategy
-from trading_system.strategies.models import SignalDirection, StrategyContext
+from trading_system.strategies.models import SignalDirection, StrategyContext, StrategySignal
 
 from .engine import BacktestConfig, BacktestState, MarketBar, execute_signal
 from .results import BacktestResult, EquityPoint
@@ -28,7 +28,7 @@ def _portfolio_state(state: BacktestState, symbol: str) -> PortfolioState:
     return PortfolioState(state.cash, balances)
 
 
-def _pre_trade_order(state: BacktestState, signal, execution_bar: MarketBar, config: BacktestConfig) -> tuple[OrderIntent | None, Decimal]:
+def _pre_trade_order(state: BacktestState, signal: StrategySignal, execution_bar: MarketBar, config: BacktestConfig) -> tuple[OrderIntent | None, Decimal]:
     buy_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
     sell_price = execution_bar.open * (Decimal("1") - config.slippage_rate)
     equity = state.cash + state.quantity * sell_price
@@ -42,6 +42,33 @@ def _pre_trade_order(state: BacktestState, signal, execution_bar: MarketBar, con
     return None, buy_price
 
 
+def _execute_integrated_signal(
+    state: BacktestState,
+    signal: StrategySignal,
+    execution_bar: MarketBar,
+    config: BacktestConfig,
+    pre_trade_config: PreTradeConfig,
+    asset_compliance: AssetCompliance | None,
+) -> BacktestState:
+    if signal.direction is SignalDirection.NO_TRADE:
+        return state
+    if signal.direction is not SignalDirection.LONG:
+        raise ValueError("only LONG and NO_TRADE are supported")
+    if asset_compliance is None:
+        raise ValueError("asset_compliance is required for executable LONG signals")
+    order, price = _pre_trade_order(state, signal, execution_bar, config)
+    if order is not None:
+        validate_pre_trade(
+            _portfolio_state(state, signal.symbol),
+            order,
+            price,
+            pre_trade_config,
+            prices={signal.symbol: price},
+            asset_compliance=asset_compliance,
+        )
+    return execute_signal(state, signal, execution_bar, config)
+
+
 def run_strategy_backtest(
     strategy: ResearchStrategy,
     data: IntegratedBacktestInput,
@@ -49,11 +76,12 @@ def run_strategy_backtest(
     *,
     pre_trade_config: PreTradeConfig = PreTradeConfig(),
 ) -> BacktestResult:
-    """Evaluate point-in-time contexts and execute resulting signals on the next bar.
+    """Evaluate point-in-time contexts and execute signals on the next bar.
 
-    Equity is marked at the current bar before any signal decided on that bar
-    is executed on the next bar, preventing future execution information from
-    leaking into the decision-time curve.
+    Signals are queued at their decision timestamp and applied at the next
+    bar's open before that bar is marked to market. Thus the equity curve never
+    contains information from a future execution while still reflecting fills
+    at their actual execution timestamp.
     """
     if not data.bars:
         raise ValueError("bars must not be empty")
@@ -74,28 +102,26 @@ def run_strategy_backtest(
     state = BacktestState(config.initial_cash, Decimal("0"))
     curve: list[EquityPoint] = []
     by_time = {signal.decision_time: signal for signal in signals}
+    pending: StrategySignal | None = None
+
     for index, bar in enumerate(data.bars):
-        # Record the portfolio as known at the decision timestamp first.
+        if pending is not None:
+            state = _execute_integrated_signal(
+                state, pending, bar, config, pre_trade_config, data.asset_compliance
+            )
+
         curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
 
         signal = by_time.get(bar.timestamp)
         if signal is not None:
-            if signal.direction is SignalDirection.LONG:
-                if index + 1 >= len(data.bars):
+            if index + 1 >= len(data.bars):
+                if signal.direction is SignalDirection.LONG:
                     raise ValueError("final-bar LONG signal has no executable next bar")
-                if data.asset_compliance is None:
-                    raise ValueError("asset_compliance is required for executable LONG signals")
-                order, price = _pre_trade_order(state, signal, data.bars[index + 1], config)
-                if order is not None:
-                    validate_pre_trade(
-                        _portfolio_state(state, signal.symbol),
-                        order,
-                        price,
-                        pre_trade_config,
-                        prices={signal.symbol: price},
-                        asset_compliance=data.asset_compliance,
-                    )
-                state = execute_signal(state, signal, data.bars[index + 1], config)
+                pending = None
+            else:
+                pending = signal
+        else:
+            pending = None
 
     peak = curve[0].equity
     max_dd = Decimal("0")
