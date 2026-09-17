@@ -4,7 +4,11 @@ from decimal import Decimal
 import pytest
 
 from trading_system.backtest.dataset_loader import load_candle_dataset
-from trading_system.data.models import Instrument, Timeframe
+from trading_system.data.models import Instrument, MarketType, Timeframe
+
+
+def _instrument() -> Instrument:
+    return Instrument(symbol="BTCUSDT", base_asset="BTC", quote_asset="USDT", market_type=MarketType.SPOT, exchange="BINANCE")
 
 
 def test_dataset_loader_composes_with_canonical_candle_conversion(tmp_path) -> None:
@@ -26,10 +30,7 @@ def test_dataset_loader_composes_with_canonical_candle_conversion(tmp_path) -> N
     pyarrow.parquet.write_table(table, target)
 
     dataset = load_candle_dataset(target)
-    candles = dataset.to_candles(
-        instrument=Instrument(symbol="BTCUSDT", venue="binance"),
-        timeframe=Timeframe("1h"),
-    )
+    candles = dataset.to_candles(instrument=_instrument(), timeframe=Timeframe("1h"))
 
     assert len(candles) == 1
     assert candles[0].open == Decimal("100")
