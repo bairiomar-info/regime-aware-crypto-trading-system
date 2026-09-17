@@ -4,8 +4,11 @@ from decimal import Decimal
 import pytest
 
 from trading_system.features.models import FeatureSnapshot
-from trading_system.regime.models import MarketState
 from trading_system.strategies.models import PortfolioContext, SignalDirection, StrategyContext, StrategySignal
+
+
+def _feature(t: datetime) -> FeatureSnapshot:
+    return FeatureSnapshot(t, Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), 1)
 
 
 def test_long_signal_requires_bounded_target_weight() -> None:
@@ -30,22 +33,21 @@ def test_confidence_is_bounded() -> None:
 
 def test_strategy_context_rejects_future_price_history() -> None:
     t = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    # FeatureSnapshot construction is intentionally delegated to the existing model contract.
-    feature = FeatureSnapshot(decision_time=t, values=())
+    feature = _feature(t)
     with pytest.raises(ValueError, match="future"):
         StrategyContext(t, "BTCUSDT", feature, price_history=((t, Decimal("100")), (t.replace(hour=1), Decimal("101"))))
 
 
 def test_strategy_context_rejects_non_chronological_history() -> None:
     t = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    feature = FeatureSnapshot(decision_time=t, values=())
+    feature = _feature(t)
     with pytest.raises(ValueError, match="chronological"):
         StrategyContext(t, "BTCUSDT", feature, price_history=((t, Decimal("100")), (t, Decimal("101"))))
 
 
 def test_portfolio_context_rejects_future_state() -> None:
     t = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    feature = FeatureSnapshot(decision_time=t, values=())
+    feature = _feature(t)
     portfolio = PortfolioContext(t.replace(hour=1), Decimal("100"), Decimal("0"))
     with pytest.raises(ValueError, match="future"):
         StrategyContext(t, "BTCUSDT", feature, portfolio=portfolio)
