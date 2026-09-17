@@ -34,8 +34,8 @@ def evaluate_robustness_gate(
     if case_count < config.min_cases:
         failures.append("insufficient_cases")
     summary = matrix.summary
-    positive_fraction = summary.positive_case_fraction
-    worst_drawdown = summary.worst_drawdown
+    positive_fraction = summary.positive_return_fraction
+    worst_drawdown = summary.max_drawdown
     if positive_fraction < config.min_positive_case_fraction:
         failures.append("positive_case_fraction_below_threshold")
     if worst_drawdown > config.max_worst_drawdown:
