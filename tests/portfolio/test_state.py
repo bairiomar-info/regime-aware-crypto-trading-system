@@ -28,3 +28,34 @@ def test_portfolio_rejects_duplicate_asset_symbols() -> None:
 def test_portfolio_rejects_negative_cash() -> None:
     with pytest.raises(ValueError, match="non-negative"):
         PortfolioState(Decimal("-1"), ())
+
+
+def test_buy_rejects_insufficient_cash_including_fee() -> None:
+    state = PortfolioState(Decimal("100"), ())
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("100"), "test")
+    with pytest.raises(ValueError, match="insufficient cash"):
+        apply_order_intent(state, order, fill_price=Decimal("100"), fee_rate=Decimal("0.01"))
+
+
+def test_sell_exact_position_removes_asset() -> None:
+    state = PortfolioState(Decimal("100"), (AssetBalance("BTCUSDT", Decimal("1")),))
+    order = OrderIntent("BTCUSDT", OrderSide.SELL, Decimal("100"), "test")
+    result = apply_order_intent(state, order, fill_price=Decimal("100"), fee_rate=Decimal("0"))
+    assert result.cash == Decimal("200")
+    assert result.balances == ()
+
+
+def test_fee_must_be_finite_and_below_one() -> None:
+    state = PortfolioState(Decimal("100"), ())
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("10"), "test")
+    for fee in (Decimal("-0.01"), Decimal("1"), Decimal("NaN")):
+        with pytest.raises(ValueError, match="fee_rate"):
+            apply_order_intent(state, order, fill_price=Decimal("100"), fee_rate=fee)
+
+
+def test_fill_price_must_be_finite_and_positive() -> None:
+    state = PortfolioState(Decimal("100"), ())
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("10"), "test")
+    for price in (Decimal("0"), Decimal("-1"), Decimal("NaN")):
+        with pytest.raises(ValueError, match="fill_price"):
+            apply_order_intent(state, order, fill_price=price, fee_rate=Decimal("0"))
