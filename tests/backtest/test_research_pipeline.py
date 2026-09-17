@@ -25,9 +25,7 @@ def _config() -> ResearchRunConfig:
         train_size=2,
         test_size=2,
         step=2,
-        backtest=BacktestConfig(
-            initial_cash=Decimal("1000"), fee_rate=Decimal("0"), slippage_rate=Decimal("0")
-        ),
+        backtest=BacktestConfig(initial_cash=Decimal("1000"), fee_rate=Decimal("0"), slippage_rate=Decimal("0")),
     )
 
 
@@ -38,7 +36,9 @@ def test_full_research_pipeline_produces_alpha_evidence() -> None:
     def signal_factory(decision_bar, history):
         return StrategySignal(
             decision_time=decision_bar.timestamp,
+            symbol="BTCUSDT",
             direction=SignalDirection.NO_TRADE,
+            reason="test_no_trade",
             target_weight=None,
         )
 
@@ -58,9 +58,9 @@ def test_pipeline_rejects_mismatched_regime_labels() -> None:
 
 def test_pipeline_rejects_configuration_that_produces_no_oos_windows() -> None:
     with pytest.raises(ValueError):
-        run_research_pipeline(_bars(3), lambda *_: None, ResearchRunConfig(
-            train_size=3,
-            test_size=3,
-            step=1,
-            backtest=_config().backtest,
-        ), ("bull", "bull", "bull"))
+        run_research_pipeline(
+            _bars(3),
+            lambda *_: None,
+            ResearchRunConfig(train_size=3, test_size=3, step=1, backtest=_config().backtest),
+            ("bull", "bull", "bull"),
+        )
