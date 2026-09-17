@@ -3,19 +3,14 @@ from decimal import Decimal
 from trading_system.backtest.robustness import SensitivityResult
 from trading_system.backtest.robustness_gate import RobustnessGateConfig, evaluate_robustness_gate
 from trading_system.backtest.robustness_matrix import RobustnessCaseResult, RobustnessMatrix
-from trading_system.backtest.robustness_report import RobustnessSummary
+from trading_system.backtest.robustness_report import summarize_results
 
 
 def matrix(results: tuple[SensitivityResult, ...]) -> RobustnessMatrix:
     cases = tuple(
         RobustnessCaseResult(result.name, "params", "cost", result) for result in results
     )
-    return RobustnessMatrix(cases, RobustnessSummary(
-        min_return=min(item.total_return for item in results),
-        median_return=sorted(item.total_return for item in results)[len(results) // 2],
-        worst_drawdown=max(item.max_drawdown for item in results),
-        positive_case_fraction=Decimal(sum(item.total_return > 0 for item in results)) / Decimal(len(results)),
-    ))
+    return RobustnessMatrix(cases, summarize_results(results))
 
 
 def test_gate_passes_when_explicit_thresholds_are_met() -> None:
