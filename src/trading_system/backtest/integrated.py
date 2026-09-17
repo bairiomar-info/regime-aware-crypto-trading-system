@@ -51,8 +51,9 @@ def run_strategy_backtest(
 ) -> BacktestResult:
     """Evaluate point-in-time contexts and execute resulting signals on the next bar.
 
-    Every non-NO_TRADE execution passes through the hard spot, asset-compliance,
-    and risk gate before the simulated fill is applied.
+    Equity is marked at the current bar before any signal decided on that bar
+    is executed on the next bar, preventing future execution information from
+    leaking into the decision-time curve.
     """
     if not data.bars:
         raise ValueError("bars must not be empty")
@@ -74,6 +75,9 @@ def run_strategy_backtest(
     curve: list[EquityPoint] = []
     by_time = {signal.decision_time: signal for signal in signals}
     for index, bar in enumerate(data.bars):
+        # Record the portfolio as known at the decision timestamp first.
+        curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
+
         signal = by_time.get(bar.timestamp)
         if signal is not None:
             if signal.direction is SignalDirection.LONG:
@@ -92,7 +96,6 @@ def run_strategy_backtest(
                         asset_compliance=data.asset_compliance,
                     )
                 state = execute_signal(state, signal, data.bars[index + 1], config)
-        curve.append(EquityPoint(bar.timestamp, state.cash + state.quantity * bar.close))
 
     peak = curve[0].equity
     max_dd = Decimal("0")
