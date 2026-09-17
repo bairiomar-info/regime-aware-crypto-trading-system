@@ -14,7 +14,17 @@ class StubStrategy:
 
 
 def regime(time: datetime, trend: TrendState) -> MarketState:
-    return MarketState(time, trend, LevelState.NORMAL, LevelState.NORMAL, LevelState.NORMAL, LevelState.NORMAL, Transition.PERSISTING_NEUTRAL, 1, Decimal("1"))
+    return MarketState(
+        decision_time=time,
+        trend=trend,
+        volatility=LevelState.NORMAL,
+        breadth=LevelState.NORMAL,
+        dispersion=LevelState.NORMAL,
+        correlation=LevelState.NORMAL,
+        transition=Transition.PERSISTING_NEUTRAL,
+        state_age=1,
+        confidence=Decimal("1"),
+    )
 
 
 def test_gate_blocks_disallowed_trend_without_changing_strategy_signal_contract() -> None:
