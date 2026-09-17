@@ -30,23 +30,39 @@ class WalkForwardConfig:
     allow_test_overlap: bool = False
 
     def __post_init__(self) -> None:
+        self._validate_sizes()
+        self._validate_min_train_observations()
+        self._validate_allow_test_overlap_type()
+        self._validate_min_vs_train_size()
+        if not self.allow_test_overlap:
+            self._validate_test_step_compatibility()
+
+    def _validate_sizes(self) -> None:
         for name in ("train_size", "test_size", "step_size"):
             _validate_size(getattr(self, name), name=name)
+
+    def _validate_min_train_observations(self) -> None:
         if not isinstance(self.min_train_observations, int) or isinstance(self.min_train_observations, bool):
             raise TypeError("min_train_observations must be an int")
         if self.min_train_observations < 1:
             raise ValueError("min_train_observations must be at least 1")
+
+    def _validate_allow_test_overlap_type(self) -> None:
         if not isinstance(self.allow_test_overlap, bool):
             raise TypeError("allow_test_overlap must be a bool")
+
+    def _validate_min_vs_train_size(self) -> None:
         if isinstance(self.train_size, int) and self.min_train_observations > self.train_size:
             raise ValueError("min_train_observations cannot exceed integer train_size")
-        if not self.allow_test_overlap:
-            if not isinstance(self.test_size, (int, timedelta)) or not isinstance(self.step_size, (int, timedelta)):
-                raise TypeError("test_size and step_size must be int or timedelta")
-            if type(self.test_size) is not type(self.step_size):
-                raise TypeError("test_size and step_size must be of the same type for comparison")
+
+    def _validate_test_step_compatibility(self) -> None:
+        if not isinstance(self.test_size, (int, timedelta)) or not isinstance(self.step_size, (int, timedelta)):
+            raise TypeError("test_size and step_size must be int or timedelta")
+        if type(self.test_size) is type(self.step_size):
             if self.step_size < self.test_size:
                 raise ValueError("step_size smaller than test_size requires allow_test_overlap=True")
+        else:
+            raise TypeError("test_size and step_size must be of the same type for comparison")
 
 
 @dataclass(frozen=True)
