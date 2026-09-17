@@ -28,8 +28,10 @@ def test_execution_uses_next_bar_and_tracks_equity() -> None:
         (signal(0),),
         BacktestConfig(Decimal("1000")),
     )
-    assert result.final_equity == Decimal("1100")
-    assert result.total_return == Decimal("0.1")
+    # Signal at t=0 executes at t=1 open (110), then is marked at t=2 close (120).
+    expected = Decimal("1090.909090909090909090909091")
+    assert result.final_equity == expected
+    assert result.total_return == Decimal("0.090909090909090909090909091")
 
 
 def test_final_bar_signal_is_rejected() -> None:

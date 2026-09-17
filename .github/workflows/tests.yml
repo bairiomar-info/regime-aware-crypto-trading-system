@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, alpha-finish-2026-09-17]
   pull_request:
 
 jobs:

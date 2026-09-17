@@ -24,6 +24,10 @@ def _candle(hour: int, open_price: str, close: str) -> Candle:
         volume=Decimal("1"),
         quote_volume=Decimal(close),
         trade_count=1,
+        taker_buy_base_volume=Decimal("0.5"),
+        taker_buy_quote_volume=Decimal(close) / Decimal("2"),
+        source="test",
+        is_closed=True,
     )
 
 

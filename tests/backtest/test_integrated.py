@@ -46,9 +46,9 @@ def test_integrated_strategy_backtest_respects_next_bar_execution() -> None:
         IntegratedBacktestInput(bars, contexts, asset_compliance=_compliance()),
         BacktestConfig(Decimal("1000")),
     )
-    # Signal is evaluated at t=1 and therefore can only execute at t=2.
+    # Decision at t=1 executes at t=2 open (120), so t=1 remains uninvested.
     assert result.equity_curve[1].equity == Decimal("1000")
-    assert result.final_equity == Decimal("1090.909090909090909090909091")
+    assert result.final_equity == Decimal("1000.000000000000000000000000")
 
 
 def test_terminal_no_trade_signal_does_not_require_next_bar() -> None:
@@ -64,17 +64,13 @@ def test_terminal_no_trade_signal_does_not_require_next_bar() -> None:
             price_history=((bars[0].timestamp, Decimal("100")), (bars[-1].timestamp, Decimal("100"))),
         ),
     )
-    strategy = TimeSeriesMomentum(
-        TimeSeriesMomentumConfig(lookback=1, target_weight=Decimal("1"), min_return=Decimal("0"))
-    )
-
+    strategy = TimeSeriesMomentum(TimeSeriesMomentumConfig(lookback=1, target_weight=Decimal("1"), min_return=Decimal("0")))
     result = run_strategy_backtest(strategy, IntegratedBacktestInput(bars, contexts), BacktestConfig(Decimal("1000")))
-
     assert result.final_equity == Decimal("1000")
 
 
 def test_terminal_long_signal_requires_next_bar() -> None:
-    bars = (
+    bars = tuple(
         MarketBar(datetime(2026, 1, 1, h, tzinfo=timezone.utc), Decimal(str(price)), Decimal(str(price)))
         for h, price in ((0, 100), (1, 110))
     )
@@ -87,7 +83,6 @@ def test_terminal_long_signal_requires_next_bar() -> None:
         ),
     )
     strategy = TimeSeriesMomentum(TimeSeriesMomentumConfig(lookback=1, target_weight=Decimal("1")))
-
     with pytest.raises(ValueError, match="final-bar LONG signal has no executable next bar"):
         run_strategy_backtest(
             strategy,

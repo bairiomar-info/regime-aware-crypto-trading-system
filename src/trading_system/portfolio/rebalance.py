@@ -23,7 +23,13 @@ def calculate_rebalance(
     equity: Decimal,
     prices: dict[str, Decimal],
 ) -> tuple[Rebalance, ...]:
-    """Calculate target-minus-current weights without mutating portfolio state."""
+    """Calculate target-minus-current weights without mutating portfolio state.
+
+    Long-only spot targets represent fractions of total portfolio equity, so
+    their aggregate weight cannot exceed 100%. This invariant prevents the
+    portfolio layer from manufacturing an impossible target allocation before
+    risk/execution are even reached.
+    """
     if not isinstance(equity, Decimal) or not equity.is_finite() or equity <= 0:
         raise ValueError("equity must be a positive finite Decimal")
     current: dict[str, Decimal] = {}
@@ -39,10 +45,15 @@ def calculate_rebalance(
 
     result: list[Rebalance] = []
     seen_targets: set[str] = set()
+    total_target_weight = Decimal("0")
     for target in targets:
         if target.symbol in seen_targets:
             raise ValueError("duplicate target symbol")
         seen_targets.add(target.symbol)
+        total_target_weight += target.target_weight
         current_weight = current.get(target.symbol, Decimal("0"))
         result.append(Rebalance(target.symbol, current_weight, target.target_weight, target.target_weight - current_weight))
+
+    if total_target_weight > Decimal("1"):
+        raise ValueError("target weights cannot exceed total portfolio weight of 1")
     return tuple(result)

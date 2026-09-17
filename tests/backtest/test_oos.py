@@ -35,7 +35,7 @@ def test_oos_runner_rejects_overlapping_test_windows() -> None:
     bars = tuple(MarketBar(start + timedelta(days=i), Decimal("100"), Decimal(str(100 + i))) for i in range(8))
     windows = (
         WalkForwardWindow(train=bars[:2], test=bars[2:5]),
-        WalkForwardWindow(train=bars[3:5], test=bars[4:7]),
+        WalkForwardWindow(train=bars[1:3], test=bars[4:7]),
     )
 
     def signals(bar: MarketBar, history: tuple[MarketBar, ...]) -> StrategySignal:

@@ -39,3 +39,33 @@ def test_rebalance_rejects_missing_position_price() -> None:
         calculate_rebalance(
             (Position("BTCUSDT", Decimal("1"), Decimal("100")),), (), equity=Decimal("1000"), prices={},
         )
+
+
+def test_rebalance_rejects_aggregate_target_weight_above_one() -> None:
+    from datetime import datetime, timezone
+    t = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    with pytest.raises(ValueError, match="total portfolio weight"):
+        calculate_rebalance(
+            (),
+            (
+                TargetPosition("BTCUSDT", Decimal("0.6"), t),
+                TargetPosition("ETHUSDT", Decimal("0.5"), t),
+            ),
+            equity=Decimal("1000"),
+            prices={},
+        )
+
+
+def test_rebalance_accepts_exactly_full_investment() -> None:
+    from datetime import datetime, timezone
+    t = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    result = calculate_rebalance(
+        (),
+        (
+            TargetPosition("BTCUSDT", Decimal("0.6"), t),
+            TargetPosition("ETHUSDT", Decimal("0.4"), t),
+        ),
+        equity=Decimal("1000"),
+        prices={},
+    )
+    assert sum(item.target_weight for item in result) == Decimal("1")
