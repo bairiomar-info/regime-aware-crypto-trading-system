@@ -31,22 +31,34 @@ def run_oos_windows(
     signal_factory: SignalFactory,
     config: BacktestConfig,
 ) -> OOSAggregate:
-    """Execute only the test portions of supplied walk-forward windows."""
+    """Execute only the test portions of supplied walk-forward windows.
+
+    OOS test windows must form one chronological, non-overlapping evaluation
+    stream. Training histories may overlap, but an observation cannot be
+    counted twice in the aggregate performance result.
+    """
     if not windows:
         raise ValueError("windows must not be empty")
     if not bars:
         raise ValueError("bars must not be empty")
 
-    available = {bar.timestamp for bar in bars}
+    supplied = {bar.timestamp: bar for bar in bars}
+    if len(supplied) != len(bars):
+        raise ValueError("supplied bars must have unique timestamps")
+
     results: list[OOSWindowResult] = []
+    previous_test_end = None
     for window in windows:
         test_bars = window.test
-        if any(bar.timestamp not in available for bar in test_bars):
-            raise ValueError("window test bars must come from the supplied bar sequence")
+        if any(supplied.get(bar.timestamp) != bar for bar in test_bars):
+            raise ValueError("window test bars must exactly match the supplied bar sequence")
         if len(test_bars) < 2:
             raise ValueError(f"window {test_bars[0].timestamp.isoformat()} has fewer than two test bars")
+        if previous_test_end is not None and test_bars[0].timestamp <= previous_test_end:
+            raise ValueError("OOS test windows must be strictly chronological and non-overlapping")
         result = run_backtest(test_bars, signal_factory, config)
         results.append(OOSWindowResult(window, result))
+        previous_test_end = test_bars[-1].timestamp
 
     compounded = Decimal("1")
     for item in results:
