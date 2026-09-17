@@ -96,7 +96,7 @@ class FeatureEngine:
             return ()
         snapshots = []
         for end in range(self.required_observations, len(next(iter(series.values()))) + 1):
-            prefix = {symbol: values[:end] for symbol, values in series.items()}
+            prefix: dict[str, Sequence[Candle]] = {symbol: values[:end] for symbol, values in series.items()}
             snapshots.append(self.compute(prefix))
         return tuple(snapshots)
 

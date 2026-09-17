@@ -131,6 +131,7 @@ def classify_market_state(
             results.append(DimensionClassification(dimension, None, False, reference_count))
             continue
         lower, lower_exit, upper_exit, upper = boundaries
+        assert lower is not None and lower_exit is not None and upper_exit is not None and upper is not None
         if not lower < lower_exit < upper_exit < upper:
             trackers[dimension.value] = DimensionTracker(state=prior.state, candidate_state=None, confirmation_count=0, state_age=prior.state_age)
             results.append(DimensionClassification(dimension, None, False, reference_count))
