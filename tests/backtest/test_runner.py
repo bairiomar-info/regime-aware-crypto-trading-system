@@ -30,6 +30,7 @@ def test_runner_executes_signal_on_next_bar() -> None:
     result = run_backtest(bars(), signal_factory, BacktestConfig(initial_cash=Decimal("100")))
     assert result.final_equity == Decimal("120")
     assert result.total_return == Decimal("0.2")
+    assert tuple(point.timestamp for point in result.equity_curve) == tuple(bar.timestamp for bar in bars())
 
 
 def test_runner_requires_two_bars() -> None:
@@ -40,6 +41,13 @@ def test_runner_requires_two_bars() -> None:
 def test_runner_rejects_non_chronological_bars() -> None:
     source = bars()
     invalid = (source[0], source[2], source[1])
+    with pytest.raises(ValueError, match="strictly chronological"):
+        run_backtest(invalid, signal_factory, BacktestConfig(initial_cash=Decimal("100")))
+
+
+def test_runner_rejects_duplicate_timestamps() -> None:
+    source = bars()
+    invalid = (source[0], source[1], source[1])
     with pytest.raises(ValueError, match="strictly chronological"):
         run_backtest(invalid, signal_factory, BacktestConfig(initial_cash=Decimal("100")))
 
@@ -65,3 +73,37 @@ def test_runner_rejects_non_signal_factory_result() -> None:
 
     with pytest.raises(TypeError, match="StrategySignal"):
         run_backtest(bars(), invalid_factory, BacktestConfig(initial_cash=Decimal("100")))
+
+
+def test_runner_passes_only_past_and_current_bar_to_signal_factory() -> None:
+    observed_lengths: list[int] = []
+
+    def factory(bar: MarketBar, history: tuple[MarketBar, ...]) -> StrategySignal:
+        observed_lengths.append(len(history))
+        assert history[-1].timestamp == bar.timestamp
+        assert all(item.timestamp <= bar.timestamp for item in history)
+        return StrategySignal(bar.timestamp, "BTCUSDT", SignalDirection.NO_TRADE, "test")
+
+    run_backtest(bars(), factory, BacktestConfig(initial_cash=Decimal("100")))
+    assert observed_lengths == [1, 2]
+
+
+def test_runner_is_deterministic_for_same_inputs() -> None:
+    config = BacktestConfig(initial_cash=Decimal("100"), fee_rate=Decimal("0.001"), slippage_rate=Decimal("0.002"))
+    first = run_backtest(bars(), signal_factory, config)
+    second = run_backtest(bars(), signal_factory, config)
+    assert first == second
+
+
+def test_runner_propagates_signal_factory_failure_without_partial_result() -> None:
+    calls = 0
+
+    def failing_factory(bar: MarketBar, history: tuple[MarketBar, ...]) -> StrategySignal:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("strategy failure")
+        return StrategySignal(bar.timestamp, "BTCUSDT", SignalDirection.NO_TRADE, "test")
+
+    with pytest.raises(RuntimeError, match="strategy failure"):
+        run_backtest(bars(), failing_factory, BacktestConfig(initial_cash=Decimal("100")))
