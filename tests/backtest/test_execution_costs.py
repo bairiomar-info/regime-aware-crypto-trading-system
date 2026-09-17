@@ -8,7 +8,13 @@ from trading_system.strategies.models import SignalDirection, StrategySignal
 
 
 def signal(weight: str, decision_hour: int = 0) -> StrategySignal:
-    return StrategySignal(datetime(2026, 9, 16, decision_hour, tzinfo=timezone.utc), "BTCUSDT", SignalDirection.LONG, "cost test", Decimal(weight))
+    return StrategySignal(
+        datetime(2026, 9, 16, decision_hour, tzinfo=timezone.utc),
+        "BTCUSDT",
+        SignalDirection.LONG,
+        "cost test",
+        target_weight=Decimal(weight),
+    )
 
 
 def bar(hour: int = 1, price: str = "100") -> MarketBar:
