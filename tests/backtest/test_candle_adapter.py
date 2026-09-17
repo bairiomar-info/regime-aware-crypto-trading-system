@@ -4,12 +4,16 @@ from decimal import Decimal
 import pytest
 
 from trading_system.backtest.candle_adapter import candles_to_market_bars
-from trading_system.data.models import Candle, Instrument, Timeframe
+from trading_system.data.models import Candle, Instrument, MarketType, Timeframe
+
+
+def _instrument() -> Instrument:
+    return Instrument(symbol="BTCUSDT", base_asset="BTC", quote_asset="USDT", market_type=MarketType.SPOT, exchange="BINANCE")
 
 
 def _candle(hour: int, open_price: str, close: str) -> Candle:
     return Candle(
-        instrument=Instrument(symbol="BTCUSDT", venue="binance"),
+        instrument=_instrument(),
         timeframe=Timeframe("1h"),
         open_time=datetime(2026, 9, 16, hour, tzinfo=timezone.utc),
         close_time=datetime(2026, 9, 16, hour, 59, 59, tzinfo=timezone.utc),
@@ -24,9 +28,7 @@ def _candle(hour: int, open_price: str, close: str) -> Candle:
 
 
 def test_candles_convert_to_market_bars_and_preserve_ohlc_inputs() -> None:
-    bars = candles_to_market_bars(
-        (_candle(0, "99", "100"), _candle(1, "101", "102"))
-    )
+    bars = candles_to_market_bars((_candle(0, "99", "100"), _candle(1, "101", "102")))
     assert len(bars) == 2
     assert bars[0].open == Decimal("99")
     assert bars[0].close == Decimal("100")
