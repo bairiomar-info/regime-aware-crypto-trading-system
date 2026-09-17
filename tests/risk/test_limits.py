@@ -15,13 +15,7 @@ def test_portfolio_equity_marks_all_assets() -> None:
 def test_order_limit_uses_total_equity() -> None:
     state = PortfolioState(Decimal("100"), (AssetBalance("ETHUSDT", Decimal("2")),))
     order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("100"), "test")
-    validate_order_risk(
-        state,
-        order,
-        Decimal("100"),
-        RiskLimits(max_order_notional=Decimal("0.5")),
-        prices={"ETHUSDT": Decimal("50")},
-    )
+    validate_order_risk(state, order, Decimal("100"), RiskLimits(max_order_notional=Decimal("0.5")), prices={"ETHUSDT": Decimal("50")})
 
 
 def test_position_limit_rejects_oversized_target() -> None:
@@ -68,7 +62,7 @@ def test_missing_price_for_existing_holding_is_rejected() -> None:
 
 def test_gross_exposure_limit_is_enforced() -> None:
     state = PortfolioState(Decimal("1000"), (AssetBalance("ETHUSDT", Decimal("5")),))
-    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("800"), "test")
+    order = OrderIntent("BTCUSDT", OrderSide.BUY, Decimal("900"), "test")
     with pytest.raises(ValueError, match="max_gross_exposure"):
         validate_order_risk(state, order, Decimal("100"), RiskLimits(max_order_notional=Decimal("1"), max_position_weight=Decimal("1"), max_gross_exposure=Decimal("0.9")), prices={"ETHUSDT": Decimal("100")})
 
