@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pytest
+
 from trading_system.backtest.engine import BacktestConfig, BacktestState, MarketBar, execute_signal
 from trading_system.strategies.models import SignalDirection, StrategySignal
 
@@ -48,3 +50,9 @@ def test_full_weight_cannot_spend_more_than_cash() -> None:
     result = execute_signal(BacktestState(Decimal("50"), Decimal("0")), _signal(SignalDirection.LONG), _bar(1), BacktestConfig(Decimal("50")))
     assert result.cash >= 0
     assert result.quantity == Decimal("0.5")
+
+
+def test_zero_weight_long_closes_position() -> None:
+    result = execute_signal(BacktestState(Decimal("0"), Decimal("10")), _signal(SignalDirection.LONG, "0"), _bar(1), BacktestConfig(Decimal("1000")))
+    assert result.quantity == Decimal("0")
+    assert result.cash == Decimal("1000")
