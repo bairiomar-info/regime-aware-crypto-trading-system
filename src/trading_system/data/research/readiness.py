@@ -34,7 +34,7 @@ class ReadinessDecision(BaseModel):
             raise ValueError("decision_time must be UTC-aware")
         return value
 
-    def model_post_init(self, __context: object) -> None:
+    def model_post_init(self) -> None:
         if self.state == ReadinessState.INSUFFICIENT_HISTORY and self.available_bars >= self.required_bars:
             raise ValueError("insufficient_history requires available_bars below required_bars")
         if self.state != ReadinessState.INSUFFICIENT_HISTORY and self.available_bars < self.required_bars:
