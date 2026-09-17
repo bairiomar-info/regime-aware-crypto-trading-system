@@ -28,7 +28,12 @@ def _portfolio_state(state: BacktestState, symbol: str) -> PortfolioState:
     return PortfolioState(state.cash, balances)
 
 
-def _pre_trade_order(state: BacktestState, signal: StrategySignal, execution_bar: MarketBar, config: BacktestConfig) -> tuple[OrderIntent | None, Decimal]:
+def _pre_trade_order(
+    state: BacktestState,
+    signal: StrategySignal,
+    execution_bar: MarketBar,
+    config: BacktestConfig,
+) -> tuple[OrderIntent | None, Decimal]:
     buy_price = execution_bar.open * (Decimal("1") + config.slippage_rate)
     sell_price = execution_bar.open * (Decimal("1") - config.slippage_rate)
     equity = state.cash + state.quantity * sell_price
@@ -88,11 +93,16 @@ def run_strategy_backtest(
     for previous, current in zip(data.bars, data.bars[1:]):
         if current.timestamp <= previous.timestamp:
             raise ValueError("bars must be strictly chronological")
+    for previous, current in zip(data.contexts, data.contexts[1:]):
+        if current.decision_time <= previous.decision_time:
+            raise ValueError("contexts must be strictly chronological")
     if any(context.symbol != data.contexts[0].symbol for context in data.contexts) if data.contexts else False:
         raise ValueError("all contexts must target the same symbol")
     bar_times = {bar.timestamp for bar in data.bars}
     if len({context.decision_time for context in data.contexts}) != len(data.contexts):
         raise ValueError("contexts must have unique decision times")
+    if any(context.decision_time not in bar_times for context in data.contexts):
+        raise ValueError("every context decision_time must correspond to a market bar")
     signals = tuple(evaluate_strategy(strategy, context) for context in data.contexts)
     if any(signal.decision_time not in bar_times for signal in signals):
         raise ValueError("every signal decision_time must correspond to a market bar")
@@ -130,4 +140,12 @@ def run_strategy_backtest(
         if peak > 0:
             max_dd = max(max_dd, (peak - point.equity) / peak)
     final = curve[-1].equity
-    return BacktestResult(config.initial_cash, state.cash, state.quantity, final, final / config.initial_cash - Decimal("1"), max_dd, tuple(curve))
+    return BacktestResult(
+        config.initial_cash,
+        state.cash,
+        state.quantity,
+        final,
+        final / config.initial_cash - Decimal("1"),
+        max_dd,
+        tuple(curve),
+    )
