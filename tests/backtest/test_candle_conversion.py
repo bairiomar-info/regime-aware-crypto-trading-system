@@ -4,7 +4,11 @@ from decimal import Decimal
 import pytest
 
 from trading_system.backtest.candle_conversion import rows_to_candles
-from trading_system.data.models import Instrument, Timeframe
+from trading_system.data.models import Instrument, MarketType, Timeframe
+
+
+def _instrument() -> Instrument:
+    return Instrument(symbol="BTCUSDT", base_asset="BTC", quote_asset="USDT", market_type=MarketType.SPOT, exchange="BINANCE")
 
 
 def _row(hour: int) -> dict:
@@ -25,7 +29,7 @@ def _row(hour: int) -> dict:
 def test_rows_convert_to_validated_candles() -> None:
     candles = rows_to_candles(
         (_row(0), _row(1)),
-        instrument=Instrument(symbol="BTCUSDT", venue="binance"),
+        instrument=_instrument(),
         timeframe=Timeframe("1h"),
         source="test.parquet",
     )
@@ -39,7 +43,7 @@ def test_empty_rows_are_rejected() -> None:
     with pytest.raises(ValueError, match="at least one candle"):
         rows_to_candles(
             (),
-            instrument=Instrument(symbol="BTCUSDT", venue="binance"),
+            instrument=_instrument(),
             timeframe=Timeframe("1h"),
             source="test.parquet",
         )
