@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Callable
 
 from .engine import BacktestConfig, MarketBar
 from .oos_experiments import Case, OOSExperimentResult, run_oos_experiments
 from .oos_runner import run_oos_backtests
-from .runner import SignalFactory
 from .walk_forward import WalkForwardWindow
 
 
@@ -15,7 +15,7 @@ def run_market_bar_oos_experiments(
     bars: Sequence[MarketBar],
     windows: Sequence[WalkForwardWindow],
     cases: Sequence[Case],
-    signal_factory_for_case: callable,
+    signal_factory_for_case: Callable,
     config: BacktestConfig,
 ) -> tuple[OOSExperimentResult, ...]:
     """Execute every case on every supplied OOS window using real MarketBars."""
