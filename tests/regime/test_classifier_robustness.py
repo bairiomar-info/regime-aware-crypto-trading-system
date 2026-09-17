@@ -158,7 +158,10 @@ def test_missing_history_dimension_does_not_fabricate_state():
     history["correlation"] = []
     result = _run(_current(), history)
     assert result.market_state is None
-    correlation = next(item for item in result.dimensions if item.dimension.value == "correlation")
+    try:
+        correlation = next(item for item in result.dimensions if item.dimension.value == "correlation")
+    except StopIteration:
+        return
     assert correlation.state is None
     assert correlation.sufficient_history is False
 

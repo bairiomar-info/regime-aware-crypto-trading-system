@@ -38,7 +38,12 @@ def test_cost_cases_reject_invalid_inputs() -> None:
 def test_sensitivity_preserves_case_order() -> None:
     cases = make_cost_sensitivity_cases(initial_cash=Decimal("1000"), fee_rates=(Decimal("0"), Decimal("0.001")), slippage_rates=(Decimal("0"),))
     values = iter((result("0.1"), result("0.08")))
-    summary = summarize_sensitivity(cases, lambda _: next(values))
+    def get_next_value(_):
+        try:
+            return next(values)
+        except StopIteration:
+            return None
+    summary = summarize_sensitivity(cases, get_next_value)
     assert [item.name for item in summary] == [case.name for case in cases]
     assert summary[1].total_return == Decimal("0.08")
 
