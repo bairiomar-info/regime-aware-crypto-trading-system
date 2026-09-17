@@ -7,8 +7,10 @@ from trading_system.backtest.robustness_report import RobustnessSummary
 def _summary(cases: int, positive: str, drawdown: str) -> RobustnessSummary:
     return RobustnessSummary(
         case_count=cases,
-        positive_return_fraction=Decimal(positive),
+        min_return=Decimal("0.01"),
         max_drawdown=Decimal(drawdown),
+        median_return=Decimal("0.02"),
+        positive_return_fraction=Decimal(positive),
     )
 
 
