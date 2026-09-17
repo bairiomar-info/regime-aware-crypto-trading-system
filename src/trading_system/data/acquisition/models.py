@@ -23,7 +23,7 @@ class AcquisitionRequest(BaseModel):
     start: datetime
     end: datetime
 
-    def model_post_init(self, __context: object) -> None:
+    def model_post_init(self) -> None:
         if self.start.tzinfo is None or self.end.tzinfo is None:
             raise ValueError("acquisition bounds must be timezone-aware")
         if self.end <= self.start:
@@ -37,7 +37,7 @@ class AcquisitionChunk(BaseModel):
     end: datetime
     sequence: int = Field(ge=0)
 
-    def model_post_init(self, __context: object) -> None:
+    def model_post_init(self) -> None:
         if self.start.tzinfo is None or self.end.tzinfo is None:
             raise ValueError("chunk bounds must be timezone-aware")
         if self.end <= self.start:
@@ -51,7 +51,7 @@ class AcquisitionCheckpoint(BaseModel):
     last_successful_boundary: datetime | None = None
     status: AcquisitionStatus = AcquisitionStatus.PENDING
 
-    def model_post_init(self, __context: object) -> None:
+    def model_post_init(self) -> None:
         if self.last_successful_boundary is not None:
             if self.last_successful_boundary.tzinfo is None:
                 raise ValueError("checkpoint boundary must be timezone-aware")

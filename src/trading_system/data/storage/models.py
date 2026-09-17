@@ -146,7 +146,7 @@ class DatasetIdentity(BaseModel):
             raise ValueError("dataset bounds must be UTC-aware")
         return value
 
-    def model_post_init(self, __context: object) -> None:
+    def model_post_init(self) -> None:
         if self.end <= self.start:
             raise ValueError("dataset end must be after start")
 
