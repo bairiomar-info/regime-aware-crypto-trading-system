@@ -30,7 +30,7 @@ def authorize_order(
 ) -> PreTradeResult:
     """Authorize one order only when every hard compliance and risk gate passes."""
     compliance = evaluate_symbol(order.symbol, forbidden_symbols)
-    if compliance.decision is not ComplianceDecision.ALLOW:
+    if compliance.decision is ComplianceDecision.REJECT:
         return PreTradeResult(False, compliance.reason)
     if asset.symbol != order.symbol:
         return PreTradeResult(False, "asset_symbol_mismatch")
