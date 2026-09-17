@@ -24,6 +24,9 @@ def test_dataset_loader_composes_with_canonical_candle_conversion(tmp_path) -> N
             "volume": [Decimal("2")],
             "quote_volume": [Decimal("201")],
             "trade_count": [10],
+            "taker_buy_base_volume": [Decimal("1")],
+            "taker_buy_quote_volume": [Decimal("100.5")],
+            "is_closed": [True],
         }
     )
     target = tmp_path / "btc.parquet"
